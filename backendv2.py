@@ -16,6 +16,12 @@ import datetime
 # --- Configuration ---
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
+COOKIE_FILE = PROJECT_ROOT / 'cookies.txt'
+
+if COOKIE_FILE.exists():
+    cookie_file = str(COOKIE_FILE)
+else:
+    cookie_file = None
 
 class DownloadResponse(BaseModel):
     message: str
@@ -108,12 +114,14 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
         'noplaylist': False,
         'noprogress': True,
         'ignoreerrors': True,
-        'quiet': False,
+        'quiet': True,
         'verbose': False,
         'no_warnings': True,
         'simulate': False,
-        'extract_flat': False
+        'extract_flat': False,
     }
+    if cookie_file:
+        ydl_opts["cookies"] = cookie_file
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
