@@ -36,15 +36,10 @@ cd Backend_yt-dlp
 ```bash
 pip install -r requirements.txt
 ```
+### 3. Get `cookies.txt`
 
-### 3. Create `cookies.txt`
-
-If the website requires authentication (e.g., YouTube), you need to pass cookies to `yt-dlp`. Follow these steps to generate `cookies.txt`:
-
-1. Get the [cookies.txt](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
-2. Log in to the website (e.g., YouTube) in your browser.
-3. Use the extension to export cookies as `cookies.txt`.
-4. Place the `cookies.txt` file in the root of the project directory.
+Google it bro, i will fix this later
+<img src="https://i.ibb.co/VYc8pVDN/stamp0238.png">
 
 ### 4. Run the Application Locally
 
