@@ -90,6 +90,44 @@ Download a video.
 
 Retrieve the downloaded file.
 
+#### Required:
+- **Path Parameter**: Replace `<session_id>` in the URL with the actual session ID (in UUID4 format) generated during the download process.
+
+#### Example URL:
+```
+http://127.0.0.1:8080/files/550e8400-e29b-41d4-a716-446655440000
+```
+Replace `550e8400-e29b-41d4-a716-446655440000` with the actual session ID returned by the `/download` endpoint.
+
+#### Example Python Script:
+```python
+import requests
+
+# Replace with your UUID4 session ID
+session_id = "550e8400-e29b-41d4-a716-446655440000"
+
+# Base URL of the API
+base_url = "http://127.0.0.1:8080/files"
+
+# Make the GET request
+response = requests.get(f"{base_url}/{session_id}")
+
+# Save the file
+if response.status_code == 200:
+    with open("downloaded_video.mp4", "wb") as file:
+        file.write(response.content)
+    print("File downloaded successfully!")
+else:
+    print(f"Failed to download file. Status code: {response.status_code}")
+```
+
+#### What You Need to Provide:
+- The `session_id` is returned in the `/download` endpoint's response. Ensure it is in UUID4 format.
+
+#### Response:
+- **Success**: The file will be downloaded.
+- **Error**: If the session ID is invalid, not in UUID4 format, or the file has expired, the response will indicate the error.
+
 ---
 
 ## Hosting on Render
