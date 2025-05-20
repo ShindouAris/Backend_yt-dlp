@@ -1,6 +1,6 @@
 # Video Downloader API
 
-This project is a Flask-based API for downloading videos using `yt-dlp`. It supports session management, automatic file cleanup, and cookie-based authentication for downloading videos from platforms requiring login.
+This project is a API for downloading videos using `yt-dlp`. It supports session management, automatic file cleanup, and cookie-based authentication for downloading videos from platforms requiring login.
 
 ---
 
