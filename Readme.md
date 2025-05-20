@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ```
 ### 3. Get `cookies.txt`
 
-Google it bro, i will fix this later
+Google it bro, i will fix this later<br/>
 <img src="https://i.ibb.co/VYc8pVDN/stamp0238.png">
 
 ### 4. Run the Application Locally
