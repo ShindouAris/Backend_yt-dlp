@@ -36,15 +36,27 @@ cd Backend_yt-dlp
 ```bash
 pip install -r requirements.txt
 ```
+
 ### 3. Get `cookies.txt`
 
-Google it bro, i will fix this later<br/>
-<img src="https://i.ibb.co/VYc8pVDN/stamp0238.png">
+To download videos from websites requiring authentication, you'll need a `cookies.txt` file. This file stores your session cookies and enables authenticated downloads.
+
+#### Steps to Generate `cookies.txt`:
+1. Install the **Cookie-Editor** extension:
+   - [Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
+   - [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
+2. Visit the website (e.g., YouTube) where you want to extract cookies.
+3. Open the Cookie-Editor extension and click **Export** to save the cookies as a `.txt` file.
+4. Save the exported file as `cookies.txt` in the root directory of this project.
+
+> **Note**: Ensure the `cookies.txt` file is in the Netscape HTTP Cookie File format. The first line in the file should either be:
+> - `# HTTP Cookie File`, or
+> - `# Netscape HTTP Cookie File`.
 
 ### 4. Run the Application Locally
 
 ```bash
-python main.py
+python backendv2.py
 ```
 
 The API will be available at `http://127.0.0.1:8080`.
