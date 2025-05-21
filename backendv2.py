@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ from shutil import rmtree
 from contextlib import asynccontextmanager
 import datetime
 from dotenv import load_dotenv
+from get_quality import fetch_format_data, FormatInfo
 
 load_dotenv()
 
@@ -20,6 +21,8 @@ load_dotenv()
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
 COOKIE_FILE = PROJECT_ROOT / 'cookies.txt'
+
+DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 if COOKIE_FILE.exists():
     cookie_file = str(COOKIE_FILE)
@@ -78,7 +81,6 @@ class FileSession:
         if self._task is None:
             self._task = create_task(self.auto_delete_file_task())
 
-
 file_session = FileSession()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -90,10 +92,7 @@ async def lifespan(app: FastAPI):
     file_session.clear_sessions()
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
-                   allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
-
-
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+                    allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
 class DownloadRequest(BaseModel):
     url: str
@@ -145,6 +144,8 @@ def get_file_name(url, format_option, output_template):
         "quiet": True,
         "simulate": True,
     }
+    if cookie_file:
+        ydl_opts["cookies"] = cookie_file
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=False)
@@ -163,6 +164,19 @@ def fetch_file(path: pathlib.Path):
         if file.is_file():
             return file.name
 
+@app.get("/all_format/{url}", response_model=list[FormatInfo])
+async def get_all_formats(url: str = Path(..., description="The video URL to fetch formats for")):
+
+    if not url.strip():
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    try:
+        formats: list[FormatInfo] = await s2a(fetch_format_data)(url, cookiefile=cookie_file)
+        if not formats:
+            raise HTTPException(status_code=404, detail="Failed to fetch formats")
+        return formats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching formats: {str(e)}")
 
 @app.post("/download")
 async def download_video(request_data: DownloadRequest):
@@ -200,7 +214,6 @@ async def download_video(request_data: DownloadRequest):
             status_code=500,
         )
 
-
 @app.get("/files/{session_id}")
 async def get_downloaded_file(session_id: str):
     file = pathlib.Path(os.path.join(PROJECT_ROOT / DOWNLOAD_FOLDER, session_id))
@@ -212,7 +225,7 @@ async def get_downloaded_file(session_id: str):
             return FileResponse(path=f, filename=filename, media_type='application/octet-stream')
     raise HTTPException(status_code=404, detail=f"File not found: {file}")
 
-if os.environ.get("KEEP_ALIVE").lower() == "true":
+if os.environ.get("KEEP_ALIVE", 'false').lower() == "true":
     @app.get("/")
     async def root():
         return {"message": "Server is running"}
