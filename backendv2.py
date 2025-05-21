@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -20,12 +20,12 @@ load_dotenv()
 # --- Configuration ---
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
-COOKIE_FILE = PROJECT_ROOT / 'cookies.txt'
+COOKIE_FILE = pathlib.Path("./cookies.txt")
 
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 if COOKIE_FILE.exists():
-    cookie_file = str(COOKIE_FILE)
+    cookie_file = COOKIE_FILE
 else:
     cookie_file = None
 
@@ -98,6 +98,13 @@ class DownloadRequest(BaseModel):
     url: str
     format: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"
 
+class FormatRequest(BaseModel):
+    url: str
+
+class FormatResponse(BaseModel):
+    name: str
+    formats: list[FormatInfo]
+
 def generate_uuid():
     return str(uuid.uuid4())
 
@@ -164,18 +171,24 @@ def fetch_file(path: pathlib.Path):
         if file.is_file():
             return file.name
 
-@app.get("/all_format/{url}", response_model=list[FormatInfo])
-async def get_all_formats(url: str = Path(..., description="The video URL to fetch formats for")):
+@app.post("/get_all_format", response_model=FormatResponse)
+async def get_all_formats(request: FormatRequest):
+
+    url = request.url
 
     if not url.strip():
         raise HTTPException(status_code=400, detail="URL is required")
 
     try:
-        formats: list[FormatInfo] = await s2a(fetch_format_data)(url, cookiefile=cookie_file)
+        formats, file_name = await s2a(fetch_format_data)(url, cookiefile=cookie_file)
         if not formats:
             raise HTTPException(status_code=404, detail="Failed to fetch formats")
-        return formats
+        return FormatResponse(
+            name=file_name,
+            formats=formats
+        )
     except Exception as e:
+        print("An error occurred while fetching formats:", str(e))
         raise HTTPException(status_code=500, detail=f"Error fetching formats: {str(e)}")
 
 @app.post("/download")

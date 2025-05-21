@@ -1,3 +1,5 @@
+from typing import Tuple, List, Any
+
 import yt_dlp
 from pydantic import BaseModel
 import pathlib
@@ -10,16 +12,20 @@ class FormatInfo(BaseModel):
     audio_format: str | None = None
     note: str | None = None
 
-def fetch_format_data(url, max_audio=3, cookiefile: pathlib.Path = pathlib.Path("./cookie.txt") ) -> list[FormatInfo]:
+def fetch_format_data(url, max_audio=3, cookiefile: pathlib.Path = pathlib.Path("./cookie.txt") ) -> tuple[
+    list[FormatInfo], Any]:
 
     opt = {
         "quiet": True
     }
-    if cookiefile.exists() and cookiefile.is_file():
-        opt["cookie"] = cookiefile
+    if cookiefile is not None and cookiefile.exists() and cookiefile.is_file():
+        opt["cookie"] = str(cookiefile)
+    else:
+        opt["cookie"] = "./cookie.txt"
 
     with yt_dlp.YoutubeDL(opt) as ydl:
         info = ydl.extract_info(url, download=False)
+        filename = ydl.prepare_filename(info)
         formats = info.get("formats", [])
 
         video_formats = [
@@ -38,7 +44,7 @@ def fetch_format_data(url, max_audio=3, cookiefile: pathlib.Path = pathlib.Path(
 
         for v in sorted(video_formats, key=lambda x: x.get("height") or 0, reverse=True):
             for a in audio_formats:
-                label = f"{v.get('height', '?')}p ({v.get('ext')}) + {round(a.get('abr', 0), 1)}kbps ({a.get('ext')})"
+                label = f"{v.get('height', '?')}p ({v.get('ext')}) [Audio: {round(a.get('abr', 0), 1)}Kbps] {'[PREMIUM]' if str(v.get('format_note')).lower() == 'premium' else ''}"
                 if round(a.get('abr', 0), 1) <= 66.7:
                     continue
                 if v.get("ext") == "webm":
@@ -68,7 +74,7 @@ def fetch_format_data(url, max_audio=3, cookiefile: pathlib.Path = pathlib.Path(
                 )
             )
 
-        return result
+        return result, filename
 
 #
 # if __name__ == '__main__':
