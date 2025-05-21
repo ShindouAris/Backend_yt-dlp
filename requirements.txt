@@ -2,3 +2,5 @@ uvicorn
 fastapi
 pydantic
 asgiref
+Flask
+python-dotenv

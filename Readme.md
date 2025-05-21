@@ -41,13 +41,13 @@ pip install -r requirements.txt
 
 To download videos from websites requiring authentication, you'll need a `cookies.txt` file. This file stores your session cookies and enables authenticated downloads.
 
-#### Steps to Generate `cookies.txt`:
+#### Steps to get `cookies.txt`:
 1. Install the **Cookie-Editor** extension:
    - [Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
    - [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
-2. Visit the website (e.g., YouTube) where you want to extract cookies.
-3. Open the Cookie-Editor extension and click **Export** to save the cookies as a `.txt` file.
-4. Save the exported file as `cookies.txt` in the root directory of this project.
+2. Visit youtube to extract cookies.
+3. Open the Cookie-Editor extension and click **Export** then choose NetScape to copy the cookies to your clipboard.
+4. Paste the exported cookie data into `cookies.txt` in the root directory of this project.
 
 > **Note**: Ensure the `cookies.txt` file is in the Netscape HTTP Cookie File format. The first line in the file should either be:
 > - `# HTTP Cookie File`, or
@@ -101,7 +101,7 @@ Replace `550e8400-e29b-41d4-a716-446655440000` with the actual session ID return
 
 #### Example Python Script:
 ```python
-import requests
+import requests # noqa
 
 # Replace with your UUID4 session ID
 session_id = "550e8400-e29b-41d4-a716-446655440000"
@@ -190,3 +190,5 @@ Click **Deploy** to start the deployment process. Once deployed, the API will be
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+<img src="https://i.pinimg.com/736x/9c/d9/2f/9cd92f33e4c3e47b30697e3e587fcc99.jpg" alt="gomen"/>

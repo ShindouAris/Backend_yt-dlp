@@ -12,6 +12,9 @@ from asyncio import sleep, create_task
 from shutil import rmtree
 from contextlib import asynccontextmanager
 import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Configuration ---
 PROJECT_ROOT = pathlib.Path(__file__).parent
@@ -208,6 +211,11 @@ async def get_downloaded_file(session_id: str):
                 raise HTTPException(status_code=404, detail=f"File not found: {file}")
             return FileResponse(path=f, filename=filename, media_type='application/octet-stream')
     raise HTTPException(status_code=404, detail=f"File not found: {file}")
+
+if os.environ.get("KEEP_ALIVE").lower() == "true":
+    @app.get("/")
+    async def root():
+        return {"message": "Server is running"}
 
 if __name__ == "__main__":
     import uvicorn
