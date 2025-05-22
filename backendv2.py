@@ -149,7 +149,7 @@ class BaseApplication(FastAPI):
             result = await s2a(run_yt_dlp_download)(url, format_option, output)
 
             if result["success"]:
-                filename = await s2a(get_file_name)(url, format_option, str(output) + '/%(title)s.%(ext)s')
+                filename = await s2a(get_file_name)(url, format_option, '%(title)s')
                 self.file_session.add_session(session_id, output)
                 return DownloadResponse(
                     message="Download completed",
@@ -183,4 +183,4 @@ class BaseApplication(FastAPI):
 if __name__ == "__main__":
     import uvicorn
     log.info(f"YT-DLP VERSION: {yt_dlp.version.__version__}")
-    uvicorn.run(BaseApplication, host="0.0.0.0", port=8080, log_config=LOGGING_CONFIG)
+    uvicorn.run(BaseApplication, host="0.0.0.0", port=8000, log_config=LOGGING_CONFIG)
