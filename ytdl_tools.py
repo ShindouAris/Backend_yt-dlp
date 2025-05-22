@@ -18,44 +18,61 @@ class FormatInfo(BaseModel):
 
 cookie_file = "./cookie.txt"
 
-def fetch_format_data(url, max_audio=3, cookiefile = "./cookie.txt" ) -> tuple[
-    list[FormatInfo], Any]:
+def fetch_format_data(url: str, max_audio: int = 3, cookiefile: str | None = "./cookie.txt") -> tuple[
+    list[FormatInfo], Any
+]:
 
     opt = {
-        "quiet": True
+        "quiet": True,
+        "no_warnings": True,
     }
     if cookiefile:
         opt["cookiefile"] = cookiefile
 
     with yt_dlp.YoutubeDL(opt) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+        except yt_dlp.utils.DownloadError as e:
+            print(f"Error extracting info: {e}")
+            return [], None
 
-        info = ydl.extract_info(url, download=False)
         filename = ydl.prepare_filename(info)
-        formats = info.get("formats", [])
+        raw_formats = info.get("formats", [])
+        if not raw_formats:
+            print("No formats found in extracted info.")
+            return [], filename
 
         video_formats = [
-            f for f in formats
-            if f.get("vcodec") != "none" and f.get("acodec") == "none"
+            f for f in raw_formats
+            if f.get("vcodec") != "none" and f.get("acodec") == "none" and f.get("height") is not None
         ]
 
         audio_formats = [
-            f for f in formats
+            f for f in raw_formats
             if f.get("acodec") != "none" and f.get("vcodec") == "none" and f.get("abr")
         ]
-
         audio_formats = sorted(audio_formats, key=lambda x: x.get("abr") or 0, reverse=True)[:max_audio]
 
         result: list[FormatInfo] = []
 
         for v in sorted(video_formats, key=lambda x: x.get("height") or 0, reverse=True):
+            video_height = v.get("height", 0)
+            video_ext = v.get("ext")
+
+            if video_ext == "webm" and video_height <= 1080:
+                continue
+
+            if v.get("format_note") is None:
+                continue # skip shit
+
             for a in audio_formats:
-                label = f"{v.get('height', '?')}p ({v.get('ext')}) [Audio: {round(a.get('abr', 0), 1)}Kbps] {'[PREMIUM]' if str(v.get('format_note')).lower() == 'premium' else ''}"
-                if round(a.get('abr', 0), 1) <= 66.7:
+                audio_bitrate_kbps = round(a.get('abr', 0), 1)
+
+                if audio_bitrate_kbps <= 66.7:
                     continue
-                if v.get("ext") == "webm":
-                    continue
-                if v.get("format_note") is None:
-                    continue # skip shit
+
+                label = f"{video_height}p ({video_ext}) [Audio: {audio_bitrate_kbps}Kbps] {'[PREMIUM]' if str(v.get('format_note')).lower() == 'premium' else ''}".strip()
+
                 result.append(
                     FormatInfo(
                         type="video+audio",
@@ -74,6 +91,7 @@ def fetch_format_data(url, max_audio=3, cookiefile = "./cookie.txt" ) -> tuple[
                     type="audio-only",
                     format=a['format_id'],
                     label=label,
+                    video_format=None,
                     audio_format=a['format_id'],
                     note=a.get("format_note")
                 )
