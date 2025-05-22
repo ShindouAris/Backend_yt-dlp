@@ -25,9 +25,9 @@ COOKIE_FILE = pathlib.Path("./cookies.txt")
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 if COOKIE_FILE.exists():
-    cookie_file = COOKIE_FILE
+    cookie_file = str(COOKIE_FILE)
 else:
-    cookie_file = None
+    cookie_file = "./cookie.txt"
 
 class DownloadResponse(BaseModel):
     message: str
