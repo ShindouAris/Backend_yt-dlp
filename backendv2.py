@@ -245,4 +245,5 @@ if os.environ.get("KEEP_ALIVE", 'false').lower() == "true":
 
 if __name__ == "__main__":
     import uvicorn
+    print(f"YT-DLP VERSION: {yt_dlp.version.__version__}")
     uvicorn.run("backendv2:app", host="0.0.0.0", port=8080)

@@ -4,4 +4,4 @@ pydantic
 asgiref
 Flask
 python-dotenv
-yt-dlp
+yt-dlp[default]>=2025.05.21.232935.dev0
