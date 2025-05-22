@@ -4,3 +4,4 @@ pydantic
 asgiref
 Flask
 python-dotenv
+yt-dlp
