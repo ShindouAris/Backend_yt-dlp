@@ -130,7 +130,7 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
         'extract_flat': False,
     }
     if cookie_file:
-        ydl_opts["cookies"] = cookie_file
+        ydl_opts["cookiefile"] = cookie_file
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
@@ -152,7 +152,7 @@ def get_file_name(url, format_option, output_template):
         "simulate": True,
     }
     if cookie_file:
-        ydl_opts["cookies"] = cookie_file
+        ydl_opts["cookiefile"] = cookie_file
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=False)
