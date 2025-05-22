@@ -156,10 +156,3 @@ def get_file_name(url, format_option, output_template):
             raise HTTPException(status_code=500, detail=f"Error extracting file name: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-def fetch_file(path: pathlib.Path):
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    for file in path.glob("*.mp4"):
-        if file.is_file():
-            return file.name
