@@ -95,7 +95,7 @@ class BaseApplication(FastAPI):
         self.add_api_route("/get_all_format", self.get_all_formats, response_model=FormatResponse, methods=["POST"])
         self.add_api_route("/download", self.download_video, methods=["POST"])
         self.add_api_route("/files/{session_id}", self.get_downloaded_file, methods=["GET"])
-        self.add_middleware(CORSMiddleware, allow_origins=["*"],
+        self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app/", "localhost:5173"],
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
         if os.environ.get("KEEP_ALIVE", 'false').lower() == "true":
             self.add_api_route("/", self.root, methods=["GET", "HEAD"])
