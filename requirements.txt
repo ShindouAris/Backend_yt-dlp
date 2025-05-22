@@ -5,3 +5,4 @@ asgiref
 Flask
 python-dotenv
 yt-dlp[default]>=2025.05.21.232935.dev0
+colorama
