@@ -169,12 +169,16 @@ class BaseApplication(FastAPI):
 
     async def get_downloaded_file(self, session_id: str):
         file = pathlib.Path(os.path.join(PROJECT_ROOT / DOWNLOAD_FOLDER, session_id))
-        for f in file.glob("*.mp4"):
-            if f.is_file():
-                filename = f.name
-                if not os.path.isfile(f):
-                    raise HTTPException(status_code=404, detail=f"File not found: {file}")
-                return FileResponse(path=f, filename=filename, media_type='application/octet-stream')
+        preferred_extensions = [
+            "mp4", "mkv", "webm", "flv", "3gp", "mov", "avi", "ts",
+            "m4a", "mp3", "ogg", "opus", "flac", "wav", "aac", "alac", "aiff", "dsf", "pcm",
+        ]
+        for ext in preferred_extensions:
+
+            for f in file.glob(f"*.{ext}"):
+                if f.is_file():
+                    filename = f.name
+                    return FileResponse(path=f, filename=filename, media_type='application/octet-stream')
         raise HTTPException(status_code=404, detail=f"File not found: {file}")
 
     async def root(self):
