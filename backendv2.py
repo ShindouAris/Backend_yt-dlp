@@ -20,7 +20,7 @@ load_dotenv()
 # --- Configuration ---
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
-COOKIE_FILE = pathlib.Path("./cookies.txt")
+COOKIE_FILE = pathlib.Path("etc/secrets/cookies.txt")
 
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 

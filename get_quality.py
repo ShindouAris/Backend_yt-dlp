@@ -21,7 +21,7 @@ def fetch_format_data(url, max_audio=3, cookiefile: pathlib.Path = pathlib.Path(
     if cookiefile is not None and cookiefile.exists() and cookiefile.is_file():
         opt["cookies"] = str(cookiefile)
     else:
-        opt["cookies"] = "./cookie.txt"
+        opt["cookies"] = "etc/secrets/cookie.txt"
 
     with yt_dlp.YoutubeDL(opt) as ydl:
         info = ydl.extract_info(url, download=False)
