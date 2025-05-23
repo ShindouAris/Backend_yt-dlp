@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 import pathlib
 from logging import getLogger
+from regex_manager import get_provider_from_url
 
 log = getLogger(__name__)
 
@@ -16,7 +17,32 @@ class FormatInfo(BaseModel):
     audio_format: str | None = None
     note: str | None = None
 
-cookie_file = "./cookie.txt"
+def get_cookie_file(platform: str) -> str:
+    """
+    Returns the path to the cookie file for a given platform.
+    """
+    match platform.lower():
+        case "youtube":
+            return "./cookie.txt"
+        case "tiktok":
+            return "./tiktok_cookie.txt"
+        case "instagram":
+            return "./instagram_cookie.txt"
+        case "facebook":
+            return "./facebook_cookie.txt"
+        case _:
+            return f"./{str(platform).lower().replace(' ', '_')}_cookie.txt"
+
+default_formatData = [
+    FormatInfo(
+        type="video+audio",
+        format=f"best",
+        label="Best_setting",
+        video_format="best",
+        audio_format="best",
+        note="Default data, no format found"
+    )
+]
 
 def fetch_format_data(url: str, max_audio: int = 3, cookiefile: str | None = "./cookie.txt") -> tuple[
     list[FormatInfo], Any
@@ -25,6 +51,7 @@ def fetch_format_data(url: str, max_audio: int = 3, cookiefile: str | None = "./
     opt = {
         "quiet": True,
         "no_warnings": True,
+        "logger": log,
     }
     if cookiefile:
         opt["cookiefile"] = cookiefile
@@ -97,6 +124,9 @@ def fetch_format_data(url: str, max_audio: int = 3, cookiefile: str | None = "./
                 )
             )
 
+        if len(result) < 1:
+            result = default_formatData
+
         return result, filename
 
 
@@ -120,9 +150,15 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
         'no_warnings': True,
         'simulate': False,
         'extract_flat': False,
+        'logger': log
     }
-    if cookie_file:
+    platform = get_provider_from_url(url)
+    if platform:
+        cookie_file = get_cookie_file(platform)
         ydl_opts["cookiefile"] = cookie_file
+    else:
+        log.warning(f"Platform not recognized for URL: {url}. Using default cookie file.")
+        ydl_opts["cookiefile"] = "./yt_dlp_cookie.txt"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
@@ -136,23 +172,3 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
                 "success": False,
             }
 
-def get_file_name(url, format_option, output_template):
-    ydl_opts = {
-        "format": format_option,
-        "outtmpl": output_template,
-        "quiet": True,
-        "simulate": True,
-    }
-    if cookie_file:
-        ydl_opts["cookiefile"] = cookie_file
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            log.debug(f"USE COOKIE: {ydl_opts.get('cookiefile', 'NO')}")
-            info_dict = ydl.extract_info(url, download=False)
-            filename = ydl.prepare_filename(info_dict)
-            log.debug(f"Extracted filename: {filename}")
-            return filename
-        except yt_dlp.utils.DownloadError as e:
-            raise HTTPException(status_code=500, detail=f"Error extracting file name: {str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")

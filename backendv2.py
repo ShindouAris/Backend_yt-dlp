@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 
-from pydantic import BaseModel
 from collections import deque
 import uuid
 import os
@@ -11,13 +10,13 @@ from asgiref.sync import sync_to_async as s2a
 from asyncio import sleep, create_task
 from shutil import rmtree
 from contextlib import asynccontextmanager
-import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-
 import yt_dlp
-from ytdl_tools import fetch_format_data, FormatInfo, get_file_name, run_yt_dlp_download
+from ytdl_tools import fetch_format_data, run_yt_dlp_download
 from geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
+from request_class import DownloadRequest, FormatRequest, FormatResponse, DownloadResponse
 
 from logging_utils import LOGGING_CONFIG
 from logging import getLogger
@@ -31,13 +30,6 @@ DOWNLOAD_FOLDER = pathlib.Path('downloads')
 
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
-class DownloadResponse(BaseModel):
-    message: str
-    filename: str | None = None
-    download_link: str | None = None
-    details: str | None = None
-    yt_dlp_output: str | None = None
-
 class FileSession:
     def __init__(self):
         self.sessions = deque()
@@ -47,7 +39,8 @@ class FileSession:
     def add_session(self, session_id, file_path: pathlib.Path =None):
         self.sessions.append(session_id)
         if file_path:
-            self.storage[session_id] = (file_path, datetime.datetime.utcnow().timestamp())
+            self.storage[session_id] = (file_path, datetime.now(timezone.utc).timestamp())
+        log.debug("Added session: %s", session_id)
 
     def __pop_session(self):
         if self.sessions:
@@ -59,11 +52,12 @@ class FileSession:
             timeout = 300
             await sleep(60)
             expired_sessions = []
-            now = datetime.datetime.utcnow().timestamp()
+            now = datetime.now(timezone.utc).timestamp()
 
             for session_id, (file_path, created_time) in list(self.storage.items()):
                 if now - created_time >= timeout:
                     if file_path.exists():
+                        log.debug("Session outdated: %s", session_id)
                         rmtree(file_path)
                     expired_sessions.append(session_id)
 
@@ -72,6 +66,7 @@ class FileSession:
                 del self.storage[session_id]
 
     def clear_sessions(self):
+        log.debug("Clearing all sessions")
         while self.sessions:
             session_id = self.__pop_session()
             file_path = self.storage.get(session_id)
@@ -83,16 +78,23 @@ class FileSession:
         if self._task is None:
             self._task = create_task(self.auto_delete_file_task())
 
-class DownloadRequest(BaseModel):
-    url: str
-    format: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"
+import os
 
-class FormatRequest(BaseModel):
-    url: str
+def resolve_file_name_from_folder(path: str) -> str:
+    """
+    Returns the first file name inside the given folder path.
+    """
+    if not path:
+        raise ValueError("Path cannot be empty")
+    if not os.path.isdir(path):
+        raise ValueError(f"'{path}' is not a directory")
 
-class FormatResponse(BaseModel):
-    name: str
-    formats: list[FormatInfo]
+    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+    if not files:
+        raise FileNotFoundError(f"No files found in folder: {path}")
+
+    return files[0]
+
 
 class BaseApplication(FastAPI):
     def __init__(self):
@@ -105,7 +107,7 @@ class BaseApplication(FastAPI):
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
         self.add_api_route("/", self.root, methods=["GET", "HEAD"])
         self.file_session = FileSession()
-        self.uptime = datetime.datetime.utcnow()
+        self.uptime = datetime.now(timezone.utc)
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -147,7 +149,8 @@ class BaseApplication(FastAPI):
         try:
             formats, file_name = await s2a(fetch_format_data)(url, max_audio=3, cookiefile="./cookie.txt")
             if not formats:
-                raise HTTPException(status_code=404, detail="Failed to fetch formats")
+                log.error(f"Fail to load formats for {url}")
+                raise HTTPException(status_code=404, detail="No formats found")
             return FormatResponse(
                 name=file_name,
                 formats=formats
@@ -172,7 +175,7 @@ class BaseApplication(FastAPI):
             result = await s2a(run_yt_dlp_download)(url, format_option, output)
 
             if result["success"]:
-                filename = await s2a(get_file_name)(url, format_option, '%(title)s')
+                filename = resolve_file_name_from_folder(str(output))
                 self.file_session.add_session(session_id, output)
                 return DownloadResponse(
                     message="Download completed",
