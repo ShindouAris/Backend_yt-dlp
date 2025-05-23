@@ -1,11 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+
 from pydantic import BaseModel
 from collections import deque
 import uuid
 import os
-import yt_dlp
 import pathlib
 from asgiref.sync import sync_to_async as s2a
 from asyncio import sleep, create_task
@@ -13,7 +13,12 @@ from shutil import rmtree
 from contextlib import asynccontextmanager
 import datetime
 from dotenv import load_dotenv
+
+
+import yt_dlp
 from ytdl_tools import fetch_format_data, FormatInfo, get_file_name, run_yt_dlp_download
+from geoblock_checker import is_geo_restricted
+
 from logging_utils import LOGGING_CONFIG
 from logging import getLogger
 
@@ -95,11 +100,11 @@ class BaseApplication(FastAPI):
         self.add_api_route("/get_all_format", self.get_all_formats, response_model=FormatResponse, methods=["POST"])
         self.add_api_route("/download", self.download_video, methods=["POST"])
         self.add_api_route("/files/{session_id}", self.get_downloaded_file, methods=["GET"])
-        self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app", "localhost:5173"],
+        self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app", "http://localhost:5173"],
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
-        if os.environ.get("KEEP_ALIVE", 'false').lower() == "true":
-            self.add_api_route("/", self.root, methods=["GET", "HEAD"])
+        self.add_api_route("/", self.root, methods=["GET", "HEAD"])
         self.file_session = FileSession()
+        self.uptime = datetime.datetime.utcnow()
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -182,7 +187,10 @@ class BaseApplication(FastAPI):
         raise HTTPException(status_code=404, detail=f"File not found: {file}")
 
     async def root(self):
-        return {"message": f"Server is running - {self.routes}"}
+        beautiful_format = ""
+        for route in self.routes:
+            beautiful_format += f"[ [{route.name}] - [{route.methods}] - [{route.path}] ]"
+        return {"message": f"Server is running - {beautiful_format} - Last restart: {self.uptime.ctime()}"}
 
 if __name__ == "__main__":
     import uvicorn
