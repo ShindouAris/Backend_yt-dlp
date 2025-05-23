@@ -72,7 +72,7 @@ To download videos from websites requiring authentication (e.g., YouTube private
     *   [Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
     *   [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
 2. Open a new private browsing/incognito window and log into YouTube.
-3. In the same window and same tab from step 1, navigate to:  
+3. In the same window and same tab from step 2, navigate to:  
    `https://www.youtube.com/robots.txt`  
    (this should be the only private/incognito browsing tab open)
 4. Export `youtube.com` cookies from the browser.
