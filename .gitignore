@@ -5,3 +5,4 @@ __pycache__
 downloads
 cookie.txt
 .logs
+.env
