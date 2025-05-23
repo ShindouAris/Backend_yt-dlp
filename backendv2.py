@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 import yt_dlp
 from ytdl_tools import fetch_format_data, FormatInfo, get_file_name, run_yt_dlp_download
-from geoblock_checker import is_geo_restricted
+from geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
 
 from logging_utils import LOGGING_CONFIG
 from logging import getLogger
@@ -100,6 +100,7 @@ class BaseApplication(FastAPI):
         self.add_api_route("/get_all_format", self.get_all_formats, response_model=FormatResponse, methods=["POST"])
         self.add_api_route("/download", self.download_video, methods=["POST"])
         self.add_api_route("/files/{session_id}", self.get_downloaded_file, methods=["GET"])
+        self.add_api_route("/geo_check", self.check_geo_block, methods=["POST"], response_model=GeoblockData)
         self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app", "http://localhost:5173"],
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
         self.add_api_route("/", self.root, methods=["GET", "HEAD"])
@@ -118,6 +119,23 @@ class BaseApplication(FastAPI):
     @staticmethod
     def generate_uuid():
         return str(uuid.uuid4())
+
+    async def check_geo_block(self, request: FormatRequest):
+
+        url = request.url
+
+        if not url.strip():
+            raise HTTPException(status_code=400, detail="URL is requied")
+
+        video_id = get_video_id(url)
+        GOOGLE_API_V3 = os.environ.get("YOUTUBE_V3_APIKEY", None)
+        if GOOGLE_API_V3 is None:
+            raise HTTPException(status_code=401, detail="This backend is not configured for geochecking")
+
+        check: GeoblockData = await is_geo_restricted(video_id, GOOGLE_API_V3)
+
+        return check
+
 
     async def get_all_formats(self, request: FormatRequest):
 
