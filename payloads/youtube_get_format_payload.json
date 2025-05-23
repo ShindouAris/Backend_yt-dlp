@@ -1,0 +1,413 @@
+{
+  "name": "ばかみたい [EamxSv3xhoE].webm",
+  "formats": [
+    {
+      "type": "video+audio",
+      "format": "313+251",
+      "label": "2160p (webm) [Audio: 134.2Kbps]",
+      "video_format": "313",
+      "audio_format": "251",
+      "note": "2160p"
+    },
+    {
+      "type": "video+audio",
+      "format": "313+140",
+      "label": "2160p (webm) [Audio: 129.5Kbps]",
+      "video_format": "313",
+      "audio_format": "140",
+      "note": "2160p"
+    },
+    {
+      "type": "video+audio",
+      "format": "313+250",
+      "label": "2160p (webm) [Audio: 69.0Kbps]",
+      "video_format": "313",
+      "audio_format": "250",
+      "note": "2160p"
+    },
+    {
+      "type": "video+audio",
+      "format": "401+251",
+      "label": "2160p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "401",
+      "audio_format": "251",
+      "note": "2160p"
+    },
+    {
+      "type": "video+audio",
+      "format": "401+140",
+      "label": "2160p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "401",
+      "audio_format": "140",
+      "note": "2160p"
+    },
+    {
+      "type": "video+audio",
+      "format": "401+250",
+      "label": "2160p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "401",
+      "audio_format": "250",
+      "note": "2160p"
+    },
+    {
+      "type": "video+audio",
+      "format": "271+251",
+      "label": "1440p (webm) [Audio: 134.2Kbps]",
+      "video_format": "271",
+      "audio_format": "251",
+      "note": "1440p"
+    },
+    {
+      "type": "video+audio",
+      "format": "271+140",
+      "label": "1440p (webm) [Audio: 129.5Kbps]",
+      "video_format": "271",
+      "audio_format": "140",
+      "note": "1440p"
+    },
+    {
+      "type": "video+audio",
+      "format": "271+250",
+      "label": "1440p (webm) [Audio: 69.0Kbps]",
+      "video_format": "271",
+      "audio_format": "250",
+      "note": "1440p"
+    },
+    {
+      "type": "video+audio",
+      "format": "400+251",
+      "label": "1440p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "400",
+      "audio_format": "251",
+      "note": "1440p"
+    },
+    {
+      "type": "video+audio",
+      "format": "400+140",
+      "label": "1440p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "400",
+      "audio_format": "140",
+      "note": "1440p"
+    },
+    {
+      "type": "video+audio",
+      "format": "400+250",
+      "label": "1440p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "400",
+      "audio_format": "250",
+      "note": "1440p"
+    },
+    {
+      "type": "video+audio",
+      "format": "137+251",
+      "label": "1080p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "137",
+      "audio_format": "251",
+      "note": "1080p"
+    },
+    {
+      "type": "video+audio",
+      "format": "137+140",
+      "label": "1080p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "137",
+      "audio_format": "140",
+      "note": "1080p"
+    },
+    {
+      "type": "video+audio",
+      "format": "137+250",
+      "label": "1080p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "137",
+      "audio_format": "250",
+      "note": "1080p"
+    },
+    {
+      "type": "video+audio",
+      "format": "399+251",
+      "label": "1080p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "399",
+      "audio_format": "251",
+      "note": "1080p"
+    },
+    {
+      "type": "video+audio",
+      "format": "399+140",
+      "label": "1080p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "399",
+      "audio_format": "140",
+      "note": "1080p"
+    },
+    {
+      "type": "video+audio",
+      "format": "399+250",
+      "label": "1080p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "399",
+      "audio_format": "250",
+      "note": "1080p"
+    },
+    {
+      "type": "video+audio",
+      "format": "136+251",
+      "label": "720p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "136",
+      "audio_format": "251",
+      "note": "720p"
+    },
+    {
+      "type": "video+audio",
+      "format": "136+140",
+      "label": "720p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "136",
+      "audio_format": "140",
+      "note": "720p"
+    },
+    {
+      "type": "video+audio",
+      "format": "136+250",
+      "label": "720p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "136",
+      "audio_format": "250",
+      "note": "720p"
+    },
+    {
+      "type": "video+audio",
+      "format": "398+251",
+      "label": "720p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "398",
+      "audio_format": "251",
+      "note": "720p"
+    },
+    {
+      "type": "video+audio",
+      "format": "398+140",
+      "label": "720p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "398",
+      "audio_format": "140",
+      "note": "720p"
+    },
+    {
+      "type": "video+audio",
+      "format": "398+250",
+      "label": "720p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "398",
+      "audio_format": "250",
+      "note": "720p"
+    },
+    {
+      "type": "video+audio",
+      "format": "135+251",
+      "label": "480p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "135",
+      "audio_format": "251",
+      "note": "480p"
+    },
+    {
+      "type": "video+audio",
+      "format": "135+140",
+      "label": "480p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "135",
+      "audio_format": "140",
+      "note": "480p"
+    },
+    {
+      "type": "video+audio",
+      "format": "135+250",
+      "label": "480p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "135",
+      "audio_format": "250",
+      "note": "480p"
+    },
+    {
+      "type": "video+audio",
+      "format": "397+251",
+      "label": "480p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "397",
+      "audio_format": "251",
+      "note": "480p"
+    },
+    {
+      "type": "video+audio",
+      "format": "397+140",
+      "label": "480p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "397",
+      "audio_format": "140",
+      "note": "480p"
+    },
+    {
+      "type": "video+audio",
+      "format": "397+250",
+      "label": "480p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "397",
+      "audio_format": "250",
+      "note": "480p"
+    },
+    {
+      "type": "video+audio",
+      "format": "134+251",
+      "label": "360p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "134",
+      "audio_format": "251",
+      "note": "360p"
+    },
+    {
+      "type": "video+audio",
+      "format": "134+140",
+      "label": "360p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "134",
+      "audio_format": "140",
+      "note": "360p"
+    },
+    {
+      "type": "video+audio",
+      "format": "134+250",
+      "label": "360p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "134",
+      "audio_format": "250",
+      "note": "360p"
+    },
+    {
+      "type": "video+audio",
+      "format": "396+251",
+      "label": "360p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "396",
+      "audio_format": "251",
+      "note": "360p"
+    },
+    {
+      "type": "video+audio",
+      "format": "396+140",
+      "label": "360p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "396",
+      "audio_format": "140",
+      "note": "360p"
+    },
+    {
+      "type": "video+audio",
+      "format": "396+250",
+      "label": "360p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "396",
+      "audio_format": "250",
+      "note": "360p"
+    },
+    {
+      "type": "video+audio",
+      "format": "133+251",
+      "label": "240p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "133",
+      "audio_format": "251",
+      "note": "240p"
+    },
+    {
+      "type": "video+audio",
+      "format": "133+140",
+      "label": "240p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "133",
+      "audio_format": "140",
+      "note": "240p"
+    },
+    {
+      "type": "video+audio",
+      "format": "133+250",
+      "label": "240p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "133",
+      "audio_format": "250",
+      "note": "240p"
+    },
+    {
+      "type": "video+audio",
+      "format": "395+251",
+      "label": "240p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "395",
+      "audio_format": "251",
+      "note": "240p"
+    },
+    {
+      "type": "video+audio",
+      "format": "395+140",
+      "label": "240p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "395",
+      "audio_format": "140",
+      "note": "240p"
+    },
+    {
+      "type": "video+audio",
+      "format": "395+250",
+      "label": "240p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "395",
+      "audio_format": "250",
+      "note": "240p"
+    },
+    {
+      "type": "video+audio",
+      "format": "160+251",
+      "label": "144p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "160",
+      "audio_format": "251",
+      "note": "144p"
+    },
+    {
+      "type": "video+audio",
+      "format": "160+140",
+      "label": "144p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "160",
+      "audio_format": "140",
+      "note": "144p"
+    },
+    {
+      "type": "video+audio",
+      "format": "160+250",
+      "label": "144p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "160",
+      "audio_format": "250",
+      "note": "144p"
+    },
+    {
+      "type": "video+audio",
+      "format": "394+251",
+      "label": "144p (mp4) [Audio: 134.2Kbps]",
+      "video_format": "394",
+      "audio_format": "251",
+      "note": "144p"
+    },
+    {
+      "type": "video+audio",
+      "format": "394+140",
+      "label": "144p (mp4) [Audio: 129.5Kbps]",
+      "video_format": "394",
+      "audio_format": "140",
+      "note": "144p"
+    },
+    {
+      "type": "video+audio",
+      "format": "394+250",
+      "label": "144p (mp4) [Audio: 69.0Kbps]",
+      "video_format": "394",
+      "audio_format": "250",
+      "note": "144p"
+    },
+    {
+      "type": "audio-only",
+      "format": "251",
+      "label": "Audio only: 134.2kbps (webm)",
+      "video_format": null,
+      "audio_format": "251",
+      "note": "medium"
+    },
+    {
+      "type": "audio-only",
+      "format": "140",
+      "label": "Audio only: 129.5kbps (m4a)",
+      "video_format": null,
+      "audio_format": "140",
+      "note": "medium"
+    },
+    {
+      "type": "audio-only",
+      "format": "250",
+      "label": "Audio only: 69.0kbps (webm)",
+      "video_format": null,
+      "audio_format": "250",
+      "note": "low"
+    }
+  ]
+}

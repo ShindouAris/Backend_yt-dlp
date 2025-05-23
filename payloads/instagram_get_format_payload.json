@@ -1,0 +1,53 @@
+{
+  "name": "Video by donwillfit [DJ-sKFqtwv9].mp4",
+  "formats": [
+    {
+      "type": "video+audio",
+      "format": "dash-1744207783198429v+dash-2425823101128640ad",
+      "label": "1920p (mp4) [Audio: 68.8Kbps]",
+      "video_format": "dash-1744207783198429v",
+      "audio_format": "dash-2425823101128640ad",
+      "note": "DASH video"
+    },
+    {
+      "type": "video+audio",
+      "format": "dash-572541938813611v+dash-2425823101128640ad",
+      "label": "1280p (mp4) [Audio: 68.8Kbps]",
+      "video_format": "dash-572541938813611v",
+      "audio_format": "dash-2425823101128640ad",
+      "note": "DASH video"
+    },
+    {
+      "type": "video+audio",
+      "format": "dash-974097458134373v+dash-2425823101128640ad",
+      "label": "1280p (mp4) [Audio: 68.8Kbps]",
+      "video_format": "dash-974097458134373v",
+      "audio_format": "dash-2425823101128640ad",
+      "note": "DASH video"
+    },
+    {
+      "type": "video+audio",
+      "format": "dash-1379581770049725v+dash-2425823101128640ad",
+      "label": "1280p (mp4) [Audio: 68.8Kbps]",
+      "video_format": "dash-1379581770049725v",
+      "audio_format": "dash-2425823101128640ad",
+      "note": "DASH video"
+    },
+    {
+      "type": "video+audio",
+      "format": "dash-2164744234006637vd+dash-2425823101128640ad",
+      "label": "960p (mp4) [Audio: 68.8Kbps]",
+      "video_format": "dash-2164744234006637vd",
+      "audio_format": "dash-2425823101128640ad",
+      "note": "DASH video"
+    },
+    {
+      "type": "audio-only",
+      "format": "dash-2425823101128640ad",
+      "label": "Audio only: 68.8kbps (m4a)",
+      "video_format": null,
+      "audio_format": "dash-2425823101128640ad",
+      "note": "DASH audio"
+    }
+  ]
+}
