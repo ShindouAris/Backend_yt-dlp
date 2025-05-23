@@ -33,7 +33,7 @@ class SpectificLevelFilter(Filter):
 INFO_FORMAT = f"{Style.DIM}[%(asctime)s]{Style.RESET_ALL} [%(name)s:%(lineno)d] [%(funcName)s] [✅] {Fore.GREEN}[%(levelname)s] - {Fore.CYAN}%(message)s{Style.RESET_ALL}"
 WARNING_FORMAT = f"{Style.DIM}[%(asctime)s]{Style.RESET_ALL} [%(name)s:%(lineno)d] [%(funcName)s] [⚠️]  {Fore.YELLOW}[%(levelname)s] - {Fore.LIGHTBLUE_EX}%(message)s{Style.RESET_ALL}"
 ERROR_FORMAT = f"{Style.DIM}[%(asctime)s]{Style.RESET_ALL} [%(name)s:%(lineno)d] [%(funcName)s] [❌] {Fore.RED}[%(levelname)s] - {Fore.LIGHTRED_EX}%(message)s{Style.RESET_ALL}"
-DEBUG_FORMAT = f"{Style.DIM}[%(asctime)s]{Style.RESET_ALL} [%(name)s:%(lineno)d] [🐛] {Fore.BLUE}[%(levelname)s] - %(message)s{Style.RESET_ALL}"
+DEBUG_FORMAT = f"{Style.DIM}[%(asctime)s]{Style.RESET_ALL} [%(name)s:%(lineno)d] [%(funcName)s] [🐛] {Fore.BLUE}[%(levelname)s] - %(message)s{Style.RESET_ALL}"
 
 DATEFMT="%d-%m-%Y %H:%M:%S"
 
