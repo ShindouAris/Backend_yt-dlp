@@ -35,7 +35,7 @@ PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
-if os.environ.get("FILE_EXPIRE_TIME", "300").isdigit():
+if os.environ.get("FILE_EXPIRE_TIME") is not None and os.environ.get("FILE_EXPIRE_TIME").isdigit():
     FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
 else:
     FILE_EXPIRE_TIME: int = 300
