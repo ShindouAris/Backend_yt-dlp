@@ -492,7 +492,7 @@ Should look like this:
 
 -   **Name**: Choose a unique name for your service (e.g., `my-video-downloader-api`).
 -   **Region**: Select a region.
--   **Branch**: `main` (or your desired branch).
+-   **Branch**: `master` (or your desired branch).
 -   **Root Directory**: Leave blank (if `backendv2.py` is in the root).
 -   **Runtime**: Select **Python**.
 -   **Build Command**:
