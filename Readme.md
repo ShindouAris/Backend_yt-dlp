@@ -4,6 +4,25 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 
 ---
 
+### 📚 Navigation
+
+* [🚀 Features](#features)
+* [🔧 Prerequisites](#prerequisites)
+* [🛠️ Local Setup](#local-setup)
+* [📡 API Endpoints](#api-endpoints)
+    * [`/`](#1-get--head-)
+    * [`/get_all_format`](#2-post-get_all_format)
+    * [`/download`](#3-post-download)
+    * [`/files/<session_id>`](#4-get-filessession_id)
+    * [`/geo_check`](#5-post-geo_check)
+* [☁️ Hosting on Render](#hosting-on-render)
+* [📝 Notes](#notes)
+* [🔐 Security Notes](#security-notes)
+* [🧹 Troubleshooting](#troubleshooting)
+* [❓ FAQ](#faq)
+* [📄 License](#license)
+---
+
 ## Features
 
 - **Fetch Video Formats**: Get a list of available video and audio formats for a given URL.
@@ -392,6 +411,13 @@ Click **Create Web Service**. Render will start the build and deployment process
 
 ---
 
+## Security Notes
+
+- The `/files/<session_id>` endpoint strictly validates that `session_id` is a UUIDv4 and ensures all file paths are resolved safely to prevent directory traversal attacks.
+- Session folders are isolated by UUID, and files are deleted after a timeout to limit exposure.
+
+---
+
 ## Troubleshooting
 
 1.  **Cookies Not Working / Authentication Fails**:
@@ -446,3 +472,4 @@ Click **Create Web Service**. Render will start the build and deployment process
 This project is licensed under the MIT License. (Assuming MIT License as is common for such open-source projects. If a specific `LICENSE` file exists in the repository, it takes precedence.)
 
 <img src="https://i.pinimg.com/736x/9c/d9/2f/9cd92f33e4c3e47b30697e3e587fcc99.jpg" alt="gomen"/>
+
