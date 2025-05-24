@@ -7,6 +7,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 ### 📚 Navigation
 
 * [🚀 Features](#features)
+* [📂 Project Structure](#project-structure)
 * [🔧 Prerequisites](#prerequisites)
 * [🛠️ Local Setup](#local-setup)
     * [Create `.env` file](#3-create-env-file)
@@ -41,6 +42,36 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     - Configurable secret key, rate limits, and rate window via environment variables.
 - **Secure File Serving**: Validates session IDs (UUID4) and protects against path traversal.
 - **CORS Enabled**: Allows requests from specified origins.
+
+---
+
+# Project structure
+```
+BACKEND_YT-DLP/
+├── .venv/
+├── assets/
+│ ├── render_deploy_clone_repo.png
+│ ├── render_deploy_config.png
+│ └── render_deploy_env_sec_config.png
+├── downloads/
+├── payloads/
+│ ├── facebook_get_format_payload.json
+│ ├── instagram_get_format_payload.json
+│ └── youtube_get_format_payload.json
+├── .env
+├── .gitignore
+├── backendv2.py
+├── cookie.txt
+├── geoblock_checker.py
+├── LICENSE
+├── logging_utils.py
+├── Readme.md
+├── regex_manager.py
+├── req_mini.txt
+├── request_class.py
+├── requirements.txt
+└── ytdl_tools.py
+```
 
 ---
 
@@ -86,7 +117,7 @@ pip install -r requirements.txt
 
 Create a `.env` file in the project root to configure the application. This is crucial for setting secrets, rate limits, and development behavior.
 
-```env
+```dotenv
 # Set to "true" for development mode (enables API docs, uses dev secret key, higher rate limits)
 # Set to "false" or omit for production mode (disables API docs, uses production secret key/defaults)
 DEVELOPMENT=true
@@ -114,7 +145,7 @@ FILE_EXPIRE_TIME=300
 - The application loads these variables using `python-dotenv`.
 - If `DEVELOPMENT` is `true`, API documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) will be available. These are disabled in production mode.
 
-### 4. (Optional) Get `cookies.txt` for `Authenticated / pass robot check` Youtube Downloads
+### 4. (Required for youtube) Get `cookies.txt` for `Authenticated / pass robot check` Youtube Downloads
 
 To download videos from websites requiring authentication (e.g., YouTube private videos, age-restricted content) or to help bypass "robot checks" which can lead to HTTP 429 errors from YouTube, you'll need a `cookies.txt` file.
 
@@ -132,7 +163,7 @@ To download videos from websites requiring authentication (e.g., YouTube private
 6.  Paste the copied cookie data into this `cookies.txt` file and save it.
 7.  Close the private browsing/incognito window so that the session is never opened in the browser again (this helps preserve the validity of the exported cookies).
 
-> **Important**:
+> [!IMPORTANT]
 > *   The `cookies.txt` file **must** be in the Netscape HTTP Cookie File format.
 > *   The very first line of the file **must** be either `# HTTP Cookie File` or `# Netscape HTTP Cookie File`.
 > *   The path to this cookie file is specified in `backendv2.py` as `cookiefile="./cookie.txt"`.
@@ -234,11 +265,13 @@ If `DEVELOPMENT=true` in your `.env` file, API docs are at `http://127.0.0.1:800
 
 The base URL for local development is `http://127.0.0.1:8000`.
 
-**Authentication**: Endpoints marked with `[Protected]` require a Bearer token in the `Authorization` header:
+> [!IMPORTANT]  
+> **Authentication**: Endpoints marked with `[Protected]` require a Bearer token in the `Authorization` header:
 `Authorization: Bearer <YOUR_SECRET_PRODUCTION_KEY>`
 The `<YOUR_SECRET_PRODUCTION_KEY>` is the value you set in your `.env` file or the default if not set.
 
-**Rate Limiting**: All endpoints are subject to IP-based rate limiting. If the limit (defined by `RATE_LIMIT` and `RATE_WINDOW` in `.env`) is exceeded, the API will respond with HTTP status `429 Too Many Requests`.
+> [!WARNING]  
+> **Rate Limiting**: All endpoints are subject to IP-based rate limiting. If the limit (defined by `RATE_LIMIT` and `RATE_WINDOW` in `.env`) is exceeded, the API will respond with HTTP status `429 Too Many Requests`.
 
 ### 1. **GET / HEAD** `/`
 
@@ -428,7 +461,7 @@ if session_id:
         print(f"An error occurred during the file download request: {e}")
 else:
     print("Could not proceed to download file as session_id was not obtained from the /download step.")
-
+```
 ### 5. **POST** `/geo_check` `[Protected]`
 
 Checks if a YouTube video is geo-restricted. Requires Bearer token authentication and `YOUTUBE_V3_APIKEY`.
@@ -619,5 +652,13 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 ## License
 
 This project is licensed under the MIT License. (Assuming MIT License as is common for such open-source projects. If a specific `LICENSE` file exists in the repository, it takes precedence.)
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+Please make sure to update tests as appropriate.
 
 <img src="https://i.pinimg.com/736x/9c/d9/2f/9cd92f33e4c3e47b30697e3e587fcc99.jpg" alt="gomen"/>
