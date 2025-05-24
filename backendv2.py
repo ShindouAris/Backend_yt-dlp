@@ -78,8 +78,6 @@ class FileSession:
         if self._task is None:
             self._task = create_task(self.auto_delete_file_task())
 
-import os
-
 def resolve_file_name_from_folder(path: str) -> str:
     """
     Returns the first file name inside the given folder path.
@@ -94,6 +92,12 @@ def resolve_file_name_from_folder(path: str) -> str:
         raise FileNotFoundError(f"No files found in folder: {path}")
 
     return files[0]
+
+def is_valid_uuid4(s: str) -> bool:
+    try:
+        return str(uuid.UUID(s, version=4)) == s
+    except ValueError:
+        return False
 
 
 class BaseApplication(FastAPI):
@@ -194,19 +198,25 @@ class BaseApplication(FastAPI):
             )
 
     async def get_downloaded_file(self, session_id: str):
-        file = pathlib.Path(os.path.join(PROJECT_ROOT / DOWNLOAD_FOLDER, session_id))
+        if not is_valid_uuid4(session_id):
+            raise HTTPException(400, detail="Invalid session ID")
+
+        base_dir = (PROJECT_ROOT / DOWNLOAD_FOLDER).resolve()
+        requested_path = (base_dir / session_id).resolve()
+
+        if not str(requested_path).startswith(str(base_dir)):
+            raise HTTPException(403, detail="Forbidden path access")
+
         preferred_extensions = [
             "mp4", "mkv", "webm", "flv", "3gp", "mov", "avi", "ts",
             "m4a", "mp3", "ogg", "opus", "flac", "wav", "aac", "alac", "aiff", "dsf", "pcm",
         ]
         for ext in preferred_extensions:
-
-            for f in file.glob(f"*.{ext}"):
+            for f in requested_path.glob(f"*.{ext}"):
                 if f.is_file():
-                    filename = f.name
-                    return FileResponse(path=f, filename=filename, media_type='application/octet-stream')
-        raise HTTPException(status_code=404, detail=f"File not found: {file}")
+                    return FileResponse(path=f, filename=f.name, media_type='application/octet-stream')
 
+        raise HTTPException(404, detail="No downloadable file found.")
     async def root(self):
         beautiful_format = ""
         for route in self.routes:
