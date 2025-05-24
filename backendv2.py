@@ -115,13 +115,17 @@ class FileSession:
                 del self.storage[session_id]
 
     def clear_sessions(self):
-        log.debug("Clearing all sessions")
+        log.debug("Clearing all sessions...")
+        s = 0
         while self.sessions:
             session_id = self.__pop_session()
             file_path = self.storage.get(session_id)
             if file_path and file_path[0].exists():
                 rmtree(file_path[0])
                 del self.storage[session_id]
+            s += 1
+
+        log.debug("Cleared %d sessions", s)
 
     def start(self):
         if self._task is None:
