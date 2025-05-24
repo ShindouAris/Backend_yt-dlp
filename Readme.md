@@ -1,6 +1,6 @@
 # Video Downloader API
 
-This project provides a FastAPI-based API for downloading videos using `yt-dlp`. It supports fetching available formats, session management for downloads, automatic file cleanup, and can utilize cookies for downloading videos from platforms requiring login (e.g., YouTube).
+This project provides a FastAPI-based API for downloading videos using `yt-dlp`. It features Bearer token authentication for key endpoints, rate limiting, session management for downloads, automatic file cleanup, and can utilize cookies for downloading videos from platforms requiring login.
 
 ---
 
@@ -9,12 +9,14 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 * [🚀 Features](#features)
 * [🔧 Prerequisites](#prerequisites)
 * [🛠️ Local Setup](#local-setup)
+    * [Create `.env` file](#3-create-env-file)
+    * [Get `cookies.txt`](#4-optional-get-cookiestxt-for-authenticated--pass-robot-check-youtube-downloads)
 * [📡 API Endpoints](#api-endpoints)
     * [`/`](#1-get--head-)
     * [`/get_all_format`](#2-post-get_all_format)
-    * [`/download`](#3-post-download)
+    * [`/download`](#3-post-download-protected)
     * [`/files/<session_id>`](#4-get-filessession_id)
-    * [`/geo_check`](#5-post-geo_check)
+    * [`/geo_check`](#5-post-geo_check-protected)
 * [☁️ Hosting on Render](#hosting-on-render)
 * [📝 Notes](#notes)
 * [🔐 Security Notes](#security-notes)
@@ -26,11 +28,17 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 ## Features
 
 - **Fetch Video Formats**: Get a list of available video and audio formats for a given URL.
-- **Download Videos**: Download videos using `yt-dlp` with user-selected formats.
+- **Download Videos**: Download videos using `yt-dlp` with user-selected formats (protected by Bearer token).
+- **Geo-restriction Check**: Check if a YouTube video is geo-restricted (protected by Bearer token, requires Google API Key).
 - **Session Management**: Each download is associated with a unique session ID.
-- **Automatic File Cleanup**: Downloaded files are automatically deleted after a configurable timeout (default: 5 minutes) to save storage.
-- **Cookie Support**: Uses `cookies.txt` for authenticated downloads (e.g., private videos, member-only content on YouTube).
-- **Geo-restriction Check**: Check if a YouTube video is geo-restricted (requires Google API Key).
+- **Automatic File Cleanup**: Downloaded files are automatically deleted after a configurable timeout (default: 5 minutes).
+- **Cookie Support**: Uses `cookies.txt` for authenticated downloads and to help bypass robot checks.
+- **Rate Limiting**: IP-based rate limiting to prevent abuse.
+- **Bearer Token Authentication**: Secures download and geo-check endpoints.
+- **Development/Production Modes**:
+    - API docs (`/docs`, `/redoc`, `/openapi.json`) are enabled only in development mode.
+    - Configurable secret key, rate limits, and rate window via environment variables.
+- **Secure File Serving**: Validates session IDs (UUID4) and protects against path traversal.
 - **CORS Enabled**: Allows requests from specified origins.
 
 ---
@@ -39,7 +47,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 
 1.  **Python**: Python 3.8+ installed.
 2.  **pip**: Python package manager (usually comes with Python).
-3.  **yt-dlp**: While the project uses `yt-dlp` as a library, you don't need to install it separately via command line if you install project dependencies from `requirements.txt`.
+3.  **Environment Variables**: Certain features and security settings are configured via environment variables (see `.env` file setup).
 4.  **(Optional) Google API Key**: For using the `/geo_check` endpoint. Must be set as `YOUTUBE_V3_APIKEY` environment variable.
 5.  **(Optional) Render Account**: If you plan to host the application on Render.
 
@@ -72,36 +80,57 @@ Install the required packages:
 pip install -r requirements.txt
 ```
 
-### 3. (Optional) Create `.env` file for API Keys
+### 3. Create `.env` file
 
-If you plan to use the geo-restriction check feature, create a `.env` file in the project root with your Google API Key:
+Create a `.env` file in the project root to configure the application. This is crucial for setting secrets, rate limits, and development behavior.
 
 ```env
+# Set to "true" for development mode (enables API docs, uses dev secret key, higher rate limits)
+# Set to "false" or omit for production mode (disables API docs, uses production secret key/defaults)
+DEVELOPMENT=true
+
+# Secret key for Bearer token authentication.
+# In production (DEVELOPMENT=false), if not set, it defaults to "youshallnotpassanysecretkey".
+# In development (DEVELOPMENT=true), it defaults to "when_the_pig_fly".
+# IMPORTANT: For production, set this to a strong, unique secret.
+SECRET_PRODUCTION_KEY=your_strong_secret_key_here
+
+# (Optional) Google API Key for /geo_check endpoint
 YOUTUBE_V3_APIKEY=your_google_api_v3_key_here
+
+# Rate Limiting Configuration
+# Max requests allowed per IP within the RATE_WINDOW.
+# Default: 150 (production), 1000 (development)
+RATE_LIMIT=150
+# Time window in seconds for rate limiting.
+# Default: 60 (production), 0 (development, effectively disabling active rate limiting by window)
+RATE_WINDOW=60
 ```
-The application will load this using `python-dotenv`.
+- The application loads these variables using `python-dotenv`.
+- If `DEVELOPMENT` is `true`, API documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) will be available. These are disabled in production mode.
 
 ### 4. (Optional) Get `cookies.txt` for `Authenticated / pass robot check` Youtube Downloads
 
-To download videos from websites requiring authentication (e.g., YouTube private videos, age-restricted content that needs login, or member-only content), you'll need a `cookies.txt` file.
+To download videos from websites requiring authentication (e.g., YouTube private videos, age-restricted content) or to help bypass "robot checks" which can lead to HTTP 429 errors from YouTube, you'll need a `cookies.txt` file.
 
 #### Steps to get `cookies.txt` from YouTube:
 
 1.  Install the **Cookie-Editor** browser extension:
     *   [Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
     *   [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
-2. Open a new private browsing/incognito window and log into YouTube.
-3. In the same window and same tab from step 2, navigate to:  
-   `https://www.youtube.com/robots.txt`  
-   (this should be the only private/incognito browsing tab open)
-4. Export `youtube.com` cookies from the browser.
-5. Close the private browsing/incognito window so that the session is never opened in the browser again.
+2.  Open a new private browsing/incognito window and log into YouTube.
+3.  In the same window and same tab from step 2, navigate to:
+    `https://www.youtube.com/robots.txt`
+    (It's recommended this be the only private/incognito browsing tab open to isolate the session cookies).
+4.  Open the Cookie-Editor extension, select **Export**, then **Netscape**, and copy the cookies to your clipboard.
+5.  Create a file named `cookies.txt` in the root directory of this project (i.e., at the same level as `backendv2.py`).
+6.  Paste the copied cookie data into this `cookies.txt` file and save it.
+7.  Close the private browsing/incognito window so that the session is never opened in the browser again (this helps preserve the validity of the exported cookies).
 
 > **Important**:
 > *   The `cookies.txt` file **must** be in the Netscape HTTP Cookie File format.
-> *   The very first line of the file **must** be either `# HTTP Cookie File` or `# Netscape HTTP Cookie File`. If it's not, `yt-dlp` may fail to parse it.
-> *   This file will be used by `yt-dlp` (via the API) to make authenticated requests. The API itself does not directly handle your login credentials.
-> *   The path to this cookie file is specified in `backendv2.py` for the `fetch_format_data` function as `cookiefile="./cookie.txt"`.
+> *   The very first line of the file **must** be either `# HTTP Cookie File` or `# Netscape HTTP Cookie File`.
+> *   The path to this cookie file is specified in `backendv2.py` as `cookiefile="./cookie.txt"`.
 
 ### 5. Run the Application Locally
 
@@ -109,13 +138,20 @@ To download videos from websites requiring authentication (e.g., YouTube private
 python backendv2.py
 ```
 
-The API will be available at `http://127.0.0.1:8000`. You should see log output indicating the server has started, including the `yt-dlp` version being used.
+The API will be available at `http://127.0.0.1:8000`.
+If `DEVELOPMENT=true` in your `.env` file, API docs are at `http://127.0.0.1:8000/docs`.
 
 ---
 
 ## API Endpoints
 
 The base URL for local development is `http://127.0.0.1:8000`.
+
+**Authentication**: Endpoints marked with `[Protected]` require a Bearer token in the `Authorization` header:
+`Authorization: Bearer <YOUR_SECRET_PRODUCTION_KEY>`
+The `<YOUR_SECRET_PRODUCTION_KEY>` is the value you set in your `.env` file or the default if not set.
+
+**Rate Limiting**: All endpoints are subject to IP-based rate limiting. If the limit (defined by `RATE_LIMIT` and `RATE_WINDOW` in `.env`) is exceeded, the API will respond with HTTP status `429 Too Many Requests`.
 
 ### 1. **GET / HEAD** `/`
 
@@ -128,9 +164,9 @@ Provides a welcome message, lists available routes, and shows server uptime.
   }
   ```
 
-### 2. **POST** `/get_all_format`
+### 2. **POST** `/get_all_format` [`Protected`]
 
-Fetches available download formats for a given video URL.
+Fetches available download formats for a given video URL. Requires Bearer token authentication.
 
 - **Request Body** (JSON, `FormatRequest`):
   ```json
@@ -138,12 +174,10 @@ Fetches available download formats for a given video URL.
     "url": "https://www.youtube.com/watch?v=example"
   }
   ```
-  *(The `url` can be for YouTube, Facebook, Instagram, or any other site supported by `yt-dlp`)*
-
 - **Response** (JSON, `FormatResponse`):
   ```json
   {
-    "name": "Video Title [video_id].ext", // Example: "ばかみたい [EamxSv3xhoE].webm"
+    "name": "Video Title [video_id].ext",
     "formats": [
       {
         "type": "video+audio", // e.g., "video+audio", "audio-only", "video-only"
@@ -160,117 +194,126 @@ Fetches available download formats for a given video URL.
         "label": "Audio only: 134.2kbps (webm)",
         "video_format": null,
         "audio_format": "251",
-        "note": "medium"
+        "note": "2160p"
       }
+      // ... more FormatInfo objects
     ]
   }
   ```
-  *(The structure of the `formats` array items is based on the `FormatInfo` Pydantic model. See the example JSON files like `youtube_get_format_payload.json` for more examples of `yt-dlp` output which this API processes.)*
+- **Error Responses**:
+    - `403 Forbidden`: Invalid or missing token.
+    - `500 Internal Server Error`: If download fails (e.g., `yt_dlp.utils.DownloadError`).
 
-### 3. **POST** `/download`
+### 3. **POST** `/download` `[Protected]`
 
-Initiates a video download for the specified URL and format.
+Initiates a video download for the specified URL and format. Requires Bearer token authentication.
 
 - **Request Body** (JSON, `DownloadRequest`):
   ```json
   {
     "url": "https://www.youtube.com/watch?v=example",
-    "format": "313+251" // format_id string obtained from /get_all_format.
-                       // Defaults to "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" if not provided.
+    "format": "313+251" // Defaults to "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" if not provided
   }
   ```
-  *(The `format` string should be one of the `format` values (e.g., `137+140`, `251`) returned by the `/get_all_format` endpoint, or a generic `yt-dlp` format selector.)*
-
 - **Successful Response** (JSON, `DownloadResponse`):
   ```json
   {
     "message": "Download completed",
-    "filename": "Video Title.ext",       // Proposed filename for the download
-    "download_link": "/files/<session_id>", // Relative link to retrieve the file
-    "details": "File has been downloaded successfully", // Optional additional details
-    "yt_dlp_output": null                 // Optional raw output from yt-dlp, if captured
+    "filename": "actual_downloaded_filename.ext", // Actual filename saved on the server in the session folder
+    "download_link": "/files/<session_id>",
+    "details": null, // Optional
+    "yt_dlp_output": null // Optional
   }
   ```
-  *(`<session_id>` will be a UUID4 string, e.g., `550e8400-e29b-41d4-a716-446655440000`. The `details` and `yt_dlp_output` fields may be `null` or absent if not applicable.)*
-
-- **Error Response** (HTTP 500, text/plain or JSON with detail):
-  ```
-  Download failed
-  ```
-  *(Or a JSON response if a specific HTTPException is raised by the server.)*
+  *(`<session_id>` will be a UUID4 string. The `filename` is the actual name of the file saved in the session folder on the server.)*
+- **Error Responses**:
+    - `403 Forbidden`: Invalid or missing token.
+    - `500 Internal Server Error`: If download fails (e.g., `yt_dlp.utils.DownloadError`).
 
 ### 4. **GET** `/files/<session_id>`
 
 Retrieve the downloaded file associated with a `session_id`. The file is served as an `application/octet-stream`.
 
 - **Path Parameter**:
-    - `session_id` (string, UUID4 format): The session ID generated during the `/download` request.
+    - `session_id` (string, **must be a valid UUID4 format**): The session ID generated during the `/download` request.
 
-- **Example URL**:
-  ```
-  http://127.0.0.1:8000/files/550e8400-e29b-41d4-a716-446655440000
-  ```
-  *(Replace `550e8400-e29b-41d4-a716-446655440000` with the actual `session_id` from the `/download` response.)*
+- **Example URL**: `http://127.0.0.1:8000/files/550e8400-e29b-41d4-a716-446655440000`
 
 - **Response**:
-    - **Success (HTTP 200)**: The file data. The `Content-Disposition` header will suggest the filename.
-    - **Error (HTTP 404)**: If the session ID is invalid, the file does not exist (e.g., expired and cleaned up), or no matching file extension is found within the session's download folder.
+    - **Success (HTTP 200)**: The file data (`FileResponse`). `Content-Disposition` header suggests the filename.
+    - **Error (HTTP 400)**: If `session_id` is not a valid UUID4.
       ```json
-      {
-        "detail": "File not found: downloads/<session_id>"
-      }
+      {"detail": "Invalid session ID"}
+      ```
+    - **Error (HTTP 403)**: If a path traversal attempt is detected.
+      ```json
+      {"detail": "Forbidden path access"}
+      ```
+    - **Error (HTTP 404)**: If session ID is valid UUID4 but no file found (e.g., expired, download failed, or incorrect session ID).
+      ```json
+      {"detail": "No downloadable file found."}
       ```
 
 #### Python Script Example to Download the File:
 
-This script demonstrates how to call the `/download` endpoint and then use its response to download the file from `/files/<session_id>`.
+This script demonstrates how to call the `/download` endpoint (with authentication) and then use its response to download the file.
 
 ```python
 import requests
 import os
-import json # For parsing JSON response
+import json
 
-# Replace with your actual API base URL if not running locally
 api_base_url = "http://127.0.0.1:8000"
+# IMPORTANT: Replace with your actual SECRET_PRODUCTION_KEY from .env
+# For development (DEVELOPMENT=true), default is "when_the_pig_fly" if not set in .env
+# For production (DEVELOPMENT=false), default is "youshallnotpassanysecretkey" if not set in .env
+secret_key = "your_strong_secret_key_here" # <<< CHANGE THIS
 
-# --- Step 1: Call /download endpoint (Example) ---
 video_url_to_download = "https://www.youtube.com/watch?v=dQw4w9WgXcQ" # Example video
-# You should first call /get_all_format to choose a specific format_id
-# For simplicity, we'll use a common format or let the server default.
-# Example: chosen_format_id = "18" (a common mp4 format for YouTube (360p))
-# Or provide a more specific one: chosen_format_id = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"
+# Get available formats via /get_all_format first if needed
+chosen_format_id = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" # Example format
 
 download_payload = {
     "url": video_url_to_download,
-    # "format": chosen_format_id # Optional: API uses a default if not specified
+    "format": chosen_format_id
+}
+headers = {
+    "Authorization": f"Bearer {secret_key}" # Authentication header
 }
 
-print(f"Requesting download for URL: {video_url_to_download}")
+print(f"Requesting download for URL: {video_url_to_download} with format: {chosen_format_id}")
 session_id = None
-suggested_filename = "downloaded_video.mp4" # Default filename
+server_filename = "downloaded_video.mp4" # Default filename if not provided by server
 
 try:
-    download_response_req = requests.post(f"{api_base_url}/download", json=download_payload)
-    download_response_req.raise_for_status() # Raise an exception for HTTP errors
+    # --- Step 1: Call /download endpoint ---
+    download_response_req = requests.post(
+        f"{api_base_url}/download",
+        json=download_payload,
+        headers=headers # Pass the auth header
+    )
+    download_response_req.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
 
-    if download_response_req.status_code == 200:
-        response_data = download_response_req.json() # Parse the DownloadResponse
-        print(f"/download response: {json.dumps(response_data, indent=2)}")
+    response_data = download_response_req.json()
+    print(f"/download response: {json.dumps(response_data, indent=2)}")
 
-        session_id = response_data.get("download_link", "").split('/')[-1]
-        if response_data.get("filename"):
-            suggested_filename = response_data.get("filename")
+    session_id_from_link = response_data.get("download_link", "").split('/')[-1]
+    if session_id_from_link: # Basic check if download_link was present and parsable
+        session_id = session_id_from_link
+    if response_data.get("filename"): # Use filename provided by server
+        server_filename = response_data.get("filename")
 
-        print(f"Download initiated. Session ID: {session_id}, Filename: {suggested_filename}")
-        if response_data.get("details"):
-            print(f"Details: {response_data.get('details')}")
-    else:
-        print(f"Error from /download endpoint: {download_response_req.status_code} - {download_response_req.text}")
+    print(f"Download initiated. Session ID: {session_id}, Server Filename: {server_filename}")
 
+except requests.exceptions.HTTPError as e:
+    print(f"Error calling /download endpoint: {e.response.status_code} - {e.response.text}")
+    if e.response.status_code == 403:
+        print("Authentication failed. Ensure your SECRET_PRODUCTION_KEY is correct and sent as a Bearer token.")
+    elif e.response.status_code == 429:
+        print("Rate limit exceeded. Please wait and try again.")
 except requests.exceptions.RequestException as e:
-    print(f"Error calling /download endpoint: {e}")
-    if hasattr(e, 'response') and e.response is not None:
-        print(f"Server response: {e.response.text}")
+    print(f"A network or other error occurred while calling /download: {e}")
+
 
 # --- Step 2: Download the file using session_id from /files endpoint ---
 if session_id:
@@ -278,43 +321,32 @@ if session_id:
     print(f"Attempting to download file from: {file_download_url}")
 
     try:
-        # It might take a moment for the server to finish downloading and preparing the file
-        # You might want to add a small delay or retry logic here if needed
-        # import time
-        # time.sleep(5) # Optional: wait a few seconds
-
         response = requests.get(file_download_url, stream=True)
-        response.raise_for_status() # Raise an exception for HTTP errors
+        response.raise_for_status()
 
-        if response.status_code == 200:
-            # Ensure the 'download_output' directory exists
-            output_dir = "download_output"
-            os.makedirs(output_dir, exist_ok=True)
-            local_filepath = os.path.join(output_dir, suggested_filename)
+        output_dir = "download_output"
+        os.makedirs(output_dir, exist_ok=True)
+        # Use the filename received from the server for saving locally
+        local_filepath = os.path.join(output_dir, server_filename)
 
-            with open(local_filepath, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192): # 8KB chunks
-                    f.write(chunk)
-            print(f"File '{suggested_filename}' downloaded successfully to '{local_filepath}'!")
-        # No need for specific 404 check here as raise_for_status() would handle it
+        with open(local_filepath, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"File '{server_filename}' downloaded successfully to '{local_filepath}'!")
 
     except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            print(f"Failed to download file. Status code: 404. File not found or session expired.")
-            print(f"Server response: {e.response.text}")
-        else:
-            print(f"Failed to download file. HTTP error: {e}")
-            print(f"Server response: {e.response.text}")
+        print(f"Failed to download file. Status code: {e.response.status_code}")
+        print(f"Server response: {e.response.text}")
     except requests.exceptions.RequestException as e:
         print(f"An error occurred during the file download request: {e}")
 else:
-    print("Could not proceed to download file as session_id was not obtained.")
+    print("Could not proceed to download file as session_id was not obtained from the /download step.")
 
 ```
 
-### 5. **POST** `/geo_check`
+### 5. **POST** `/geo_check` `[Protected]`
 
-Checks if a YouTube video is geo-restricted. This endpoint requires the `YOUTUBE_V3_APIKEY` environment variable to be set on the server.
+Checks if a YouTube video is geo-restricted. Requires Bearer token authentication and `YOUTUBE_V3_APIKEY`.
 
 - **Request Body** (JSON, `FormatRequest`):
   ```json
@@ -325,33 +357,30 @@ Checks if a YouTube video is geo-restricted. This endpoint requires the `YOUTUBE
 - **Response** (JSON, `GeoblockData`):
   ```json
   {
-    "url": "https://www.youtube.com/watch?v=some_video_id",
-    "allowed_country": ["US", "CA"], // List of allowed country codes (e.g., ISO 3166-1 alpha-2)
-    "blocked_country": ["DE", "FR"]   // List of blocked country codes
+    "url": "https://www.youtube.com/watch?v=some_video_id", // Or just video_id based on GeoblockData model
+    "allowed_country": ["US", "CA"],
+    "blocked_country": ["DE", "FR"]
   }
   ```
-  *(The `allowed_country` and `blocked_country` lists will contain strings representing country codes. If the information is not available or the video is not restricted, these lists might be empty. The exact content depends on the output of the underlying `is_geo_restricted` function from `geoblock_checker.py` and its compatibility with this `GeoblockData` model.)*
-- **Error Response** (HTTP 401, JSON): If `YOUTUBE_V3_APIKEY` is not configured on the server.
-  ```json
-  {
-    "detail": "This backend is not configured for geochecking"
-  }
-  ```
+  *(The exact fields depend on the `GeoblockData` Pydantic model definition used in `backendv2.py` and the output of `is_geo_restricted` function.)*
+- **Error Responses**:
+    - `401 Unauthorized`: If `YOUTUBE_V3_APIKEY` is not configured on the server.
+    - `403 Forbidden`: Invalid or missing token.
 
 ---
 
 ## Hosting on Render
 
-## 1. Create a Render Account
+### 1. Create a Render Account
 
-1. **Do it yourself!**
+1. **Do it yourself!** (Sign up at [render.com](https://render.com/))
 
 ### 2. Create a New Web Service on Render
 
 1.  Log in to your [Render](https://render.com/) dashboard.
 2.  Click **New +** > **Web Service**.
-3. Select Public GitHub repository.
-4. Paste the repo in (https://github.com/ShindouAris/Backend_yt-dlp.git)
+3.  Select **Public GitHub repository**.
+4.  Paste the repo URL: `https://github.com/ShindouAris/Backend_yt-dlp.git` (or your fork).
 
 Should look like this:
 <img src="assets/render_deploy_clone_repo.png">
@@ -359,10 +388,10 @@ Should look like this:
 ### 3. Configure the Service
 
 -   **Name**: Choose a unique name for your service (e.g., `my-video-downloader-api`).
--   **Region**: Select a region geographically close to you or your users.
--   **Branch**: Select the branch to deploy (e.g., `main` or `master`).
--   **Root Directory**: Leave as is if your `backendv2.py` and `requirements.txt` are in the root of the repository. If they are in a subdirectory, specify it here.
--   **Runtime**: Select **Python**. Render will typically pick a recent Python 3 version. You can specify one via `PYTHON_VERSION` environment variable if needed.
+-   **Region**: Select a region.
+-   **Branch**: `main` (or your desired branch).
+-   **Root Directory**: Leave blank (if `backendv2.py` is in the root).
+-   **Runtime**: Select **Python**.
 -   **Build Command**:
     ```bash
     pip install -r requirements.txt --pre
@@ -371,100 +400,107 @@ Should look like this:
     ```bash
     python backendv2.py
     ```
-    *(The application in `backendv2.py` is hardcoded to run on host `0.0.0.0` and port `8000`. Render automatically maps its external port (80/443 for HTTP/HTTPS) to the port your application listens on internally, as long as your app listens on `0.0.0.0`. Port `8000` should work fine.)*
-
--   **Instance Type**: Choose a plan (e.g., the Free plan for testing/small projects).
+-   **Instance Type**: Choose a plan (e.g., Free).
 
 Should look like this:
 <img src="assets/render_deploy_config.png">
+
 ### 4. Add Environment Variables (and Secret Files if needed)
 
-Navigate to the **Environment** tab for your newly created service.
+Navigate to the **Environment** tab for your service.
 
 -   **Environment Variables**:
-    -   If you plan to use the `/geo_check` endpoint, add an environment variable:
-        -   **Key**: `YOUTUBE_V3_APIKEY`
-        -   **Value**: Your Google API v3 key.
-    -   Optionally, set `PYTHON_VERSION` (e.g., `3.10.12`) if you need a specific Python version.
+    -   **Key**: `DEVELOPMENT`
+        **Value**: `false` (Crucial for production: disables docs, enables production defaults)
+    -   **Key**: `SECRET_PRODUCTION_KEY`
+        **Value**: `your_very_strong_and_unique_secret_key_for_production` (Set a strong secret!)
+    -   **Key**: `YOUTUBE_V3_APIKEY` (Optional, for `/geo_check`)
+        **Value**: `your_google_api_v3_key`
+    -   **Key**: `RATE_LIMIT` (Optional, defaults to 150 in production)
+        **Value**: e.g., `100`
+    -   **Key**: `RATE_WINDOW` (Optional, defaults to 60 in production)
+        **Value**: e.g., `60`
+    -   Optionally, set `PYTHON_VERSION` (e.g., `3.10.12`).
 -   **Secret Files**:
     -   If you need `cookies.txt` for authenticated downloads:
         1.  Click **Add Secret File**.
         2.  **Filename**: `cookies.txt`
         3.  **Contents**: Paste the entire content of your local `cookies.txt` file.
-            This file will be created in your project's root directory at build/runtime on Render, making it available to `backendv2.py`.
-        4. Click **Save**.<br/>
+        4.  Click **Save Changes**.
 
 Should look like this:
 <img src="assets/render_deploy_env_sec_config.png">
+
 ### 5. Deploy
 
-Click **Create Web Service**. Render will start the build and deployment process. You can monitor the logs under the **Events** or **Logs** tab. Once deployed, your API will be accessible via the URL provided by Render (e.g., `https://your-service-name.onrender.com`).
+Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once deployed, the API will be accessible via the Render-provided URL.
 
 ---
 
 ## Notes
 
--   **`cookies.txt`**: This file is crucial for accessing content that requires login (e.g., private YouTube videos, member-only content). Ensure it's correctly formatted and placed in the project root (or configured as a secret file on Render). Cookies can expire, so you might need to update this file periodically.
--   **`downloads` Folder**: This folder is created automatically in the project's working directory (e.g., `/opt/render/project/src/downloads` on Render, or `./downloads` locally) to store downloaded files temporarily. On platforms like Render, this storage is ephemeral and will be lost if the instance restarts or redeploys.
--   **File Auto-Deletion**: Files in the `downloads/<session_id>/` folder are automatically deleted 5 minutes after their corresponding session is created (i.e., after the download completes). This is managed by the `FileSession.auto_delete_file_task` in `backendv2.py`. The `timeout` is currently set to 300 seconds.
--   **CORS Origins**: The API is configured in `backendv2.py` to allow requests from `https://youtube-downloader-nine-drab.vercel.app` and `http://localhost:5173`. If your frontend is hosted on a different domain, you'll need to add it to the `allow_origins` list in the `CORSMiddleware` setup.
+-   **`SECRET_PRODUCTION_KEY`**: This is your API's master key for protected endpoints. Keep it secret and make it strong, especially in production. The defaults are for convenience, not security.
+-   **API Docs in Production**: If `DEVELOPMENT` is `false` (recommended for production), the API docs at `/docs`, `/redoc`, and `/openapi.json` are disabled for security. Set `DEVELOPMENT=true` locally to view them.
+-   **`cookies.txt`**: Still vital for accessing content requiring login or bypassing bot checks. Cookies expire, so update `cookies.txt` periodically.
+-   **`downloads` Folder**: Ephemeral storage. Files are auto-deleted (default 5 mins).
+-   **CORS Origins**: Update `allow_origins` in `backendv2.py` if your frontend is on a different domain.
 
 ---
 
 ## Security Notes
 
-- The `/files/<session_id>` endpoint strictly validates that `session_id` is a UUIDv4 and ensures all file paths are resolved safely to prevent directory traversal attacks.
-- Session folders are isolated by UUID, and files are deleted after a timeout to limit exposure.
+-   **Authentication**: The `/download` and `/geo_check` endpoints are protected by Bearer token authentication using `SECRET_PRODUCTION_KEY`.
+-   **Rate Limiting**: IP-based rate limiting (`RateLimitMiddleware`) helps protect against DoS attacks and abuse. Configure `RATE_LIMIT` and `RATE_WINDOW` appropriately for your expected load.
+-   **File Serving**:
+    -   The `/files/<session_id>` endpoint strictly validates that `session_id` is a UUIDv4 using `is_valid_uuid4`.
+    -   Path traversal is prevented by resolving paths and checking if the requested path is within the designated `DOWNLOAD_FOLDER`.
+-   **Development Mode**: Setting `DEVELOPMENT="false"` in production is critical as it disables debug/doc endpoints.
+-   **Environment Variables**: Sensitive configurations like `SECRET_PRODUCTION_KEY` and `YOUTUBE_V3_APIKEY` should be managed securely as environment variables, not hardcoded.
+-   **Session Isolation**: Downloaded files are stored in session-specific folders named by UUID, limiting access. Automatic deletion further reduces exposure.
 
 ---
 
 ## Troubleshooting
 
-1.  **Cookies Not Working / Authentication Fails**:
-    *   Ensure `cookies.txt` is present in the project's root directory (or correctly configured as a secret file on Render).
-    *   Verify the `cookies.txt` file is in the correct Netscape format and the first line is exactly `# HTTP Cookie File` or `# Netscape HTTP Cookie File`. Any deviation can cause parsing errors.
-    *   Cookies expire. If downloads that previously worked start failing, try re-exporting your cookies and updating the `cookies.txt` file.
-2.  **`File not found` (404 for `/files/<session_id>`)**:
-    *   Double-check that the `session_id` in the URL is correct and matches the one received from a successful `/download` response.
-    *   The file might have been deleted by the auto-cleanup process (default is 5 minutes after download completion). You may need to initiate the download again.
-    *   Check server logs for any errors during the download or file storage process. On Render, ensure the `downloads` directory is writable by the application.
-3.  **Deployment Issues on Render**:
-    *   Carefully review the Render deployment logs (under **Events**) for any build errors (e.g., missing packages, Python version issues) or runtime errors (e.g., application failing to start).
-    *   Ensure all dependencies listed in `requirements.txt` are compatible with the Render environment (Linux).
-    *   Verify your Start Command (`python backendv2.py`) is correct and `backendv2.py` is in the expected location.
-4.  **Geo-check Fails (401 Unauthorized or Pydantic Validation Error)**:
-    *   For 401: Confirm the `YOUTUBE_V3_APIKEY` environment variable is correctly set in your Render service's environment settings. Verify that the API key is valid, active, and has the "YouTube Data API v3" enabled in your Google Cloud Console project.
-    *   For Pydantic Validation Error (if `/geo_check` returns an unexpected structure): The `is_geo_restricted` function (in `geoblock_checker.py`) might be returning data that doesn't match the `GeoblockData` model (which expects `url`, `allowed_country`, `blocked_country`). You may need to adjust the `GeoblockData` model in `backendv2.py` or modify `is_geo_restricted` to return data in the expected format.
-5.  **Error Fetching Formats (HTTP 500 from `/get_all_format`)**:
-    *   The provided video URL might be invalid, or the video could be private, deleted, or heavily restricted.
-    *   `yt-dlp` might be encountering issues with that specific website or URL structure. You can check the `yt-dlp` GitHub issues page for similar problems.
-    *   If the content is from a site requiring login and you haven't provided a valid `cookies.txt`, this could be the cause. Check server logs for more detailed error messages from `yt-dlp`.
+1.  **403 Forbidden (Invalid or missing token)** for `/download` or `/geo_check`:
+    *   Ensure you are sending the `Authorization` header correctly: `Authorization: Bearer <your_token>`.
+    *   Verify that `<your_token>` matches the `SECRET_PRODUCTION_KEY` value set in your `.env` file (or Render environment variables).
+2.  **429 Too Many Requests**:
+    *   Your IP has exceeded the configured rate limit. Wait for the `RATE_WINDOW` duration before trying again.
+    *   If self-hosting, you can adjust `RATE_LIMIT` and `RATE_WINDOW` in your `.env` file.
+3.  **API Docs (Swagger/ReDoc) Not Showing (404 on `/docs`)**:
+    *   API documentation is only enabled if the `DEVELOPMENT` environment variable is set to `true`. This is a security measure for production.
+4.  **400 Bad Request for `/files/<session_id>` with detail "Invalid session ID"**:
+    *   The `session_id` provided in the URL is not a valid UUIDv4 string. Ensure you are using the exact UUID generated by the `/download` endpoint.
+5.  **Cookies Not Working / `yt-dlp` errors (e.g., 429 from YouTube, authentication issues)**:
+    *   Ensure `cookies.txt` is present in the project's root (or correctly configured as a secret file on Render).
+    *   Verify `cookies.txt` format (Netscape, first line `# HTTP Cookie File` or `# Netscape HTTP Cookie File`).
+    *   Cookies expire. Re-export fresh cookies using the private/incognito window method.
+6.  **`File not found` (404 for `/files/<session_id>` with detail "No downloadable file found.")**:
+    *   The `session_id` (even if a valid UUID) might be incorrect, the corresponding download might have failed, or the file was deleted by the auto-cleanup (default 5 mins).
+    *   Check server logs for download errors during the `/download` step.
+7.  **Deployment Issues on Render**:
+    *   Review Render deployment logs for build or runtime errors.
+    *   Ensure all necessary environment variables (especially `DEVELOPMENT="false"` and a strong `SECRET_PRODUCTION_KEY` for production) are correctly set in Render's environment settings.
+8.  **Geo-check Fails (401 Unauthorized or Pydantic Validation Error)**:
+    *   For 401: Confirm `YOUTUBE_V3_APIKEY` environment variable is correctly set and the key is valid/enabled.
+    *   For Pydantic Error: The `is_geo_restricted` function might return data incompatible with the `GeoblockData` model.
 
 ---
 
 ## FAQ
 
 1.  **How do I change the download format?**
-    -   First, call the `/get_all_format` endpoint with the video URL. This will return a list of available formats, each with a `format` string (e.g., `"137+140"`, `"251"`) and a human-readable `label`.
-    -   In the request body of the `/download` endpoint, set the `format` field to the desired `format` string from the `/get_all_format` response. For example: `{"url": "...", "format": "137+140"}`. If the `format` field is omitted, the API will use the default: `"bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"`.
+    -   Call `/get_all_format` to list formats. Use the `format` string (e.g., `"137+140"`) from that response in the `/download` request body. Defaults to `"bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"` if `format` is omitted.
 
 2.  **Can I download playlists?**
-    -   No, this specific API is designed for downloading single videos at a time. While `yt-dlp` itself supports playlist downloads, the API endpoints (`/get_all_format`, `/download`) expect a URL pointing to a single video.
+    -   No, this API is for single video downloads.
 
 3.  **How are large files handled? Are there size limits?**
-    -   The API downloads the video to the server's temporary storage (`downloads` folder) before you can retrieve it via `/files/<session_id>`.
-    -   The primary limitation will be the disk space available on the server where the API is hosted. Free tiers of platforms like Render usually have limited (and ephemeral) disk space.
-    -   Downloaded files are automatically deleted 5 minutes after the download completes to conserve space. If you need to store files longer or handle very large files consistently, you might need to:
-        *   Modify the `timeout` in the `auto_delete_file_task` method within the `FileSession` class in `backendv2.py`.
-        *   Consider a hosting plan with more disk space or integrate external storage (like S3).
+    -   Files are temporarily stored on the server. Limits depend on server disk space (ephemeral on Render's free tier). Auto-deleted after 5 minutes. For longer storage/larger files, modify `timeout` in `FileSession` or consider plans with more disk.
 
 4.  **How do I get the `cookies.txt` file?**
-    -   Please refer to the detailed instructions in the "Local Setup" section under "4. (Optional) Get `cookies.txt` for Authenticated Downloads". This involves:
-        1.  Installing a browser extension like Cookie-Editor.
-        2.  Logging into the website (e.g., YouTube) in your browser.
-        3.  Using the extension to export cookies in **Netscape** format.
-        4.  Saving this data into a file named `cookies.txt` in the project's root directory.
-    -   **Crucially**, ensure the first line of `cookies.txt` is either `# HTTP Cookie File` or `# Netscape HTTP Cookie File`.
+    -   Refer to "Local Setup" section: "4. (Optional) Get `cookies.txt`...". Key steps: use Cookie-Editor, private/incognito window, export Netscape format, save as `cookies.txt` with correct first line.
 
 ---
 ## License
@@ -472,4 +508,4 @@ Click **Create Web Service**. Render will start the build and deployment process
 This project is licensed under the MIT License. (Assuming MIT License as is common for such open-source projects. If a specific `LICENSE` file exists in the repository, it takes precedence.)
 
 <img src="https://i.pinimg.com/736x/9c/d9/2f/9cd92f33e4c3e47b30697e3e587fcc99.jpg" alt="gomen"/>
-
+```

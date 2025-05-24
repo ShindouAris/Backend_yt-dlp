@@ -1,6 +1,9 @@
-from fastapi import FastAPI, HTTPException
+import time
+from typing import Dict
+
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 
 from collections import deque
 import uuid
@@ -14,6 +17,9 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 import yt_dlp
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from ytdl_tools import fetch_format_data, run_yt_dlp_download
 from geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
 from request_class import DownloadRequest, FormatRequest, FormatResponse, DownloadResponse
@@ -27,8 +33,46 @@ log = getLogger(__name__)
 
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
-
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+IS_DEVELOPMENT = os.environ.get("DEVELOPMENT", "False").lower() == "true"
+if not IS_DEVELOPMENT:
+    SECRET_PRODUCTION_KEY = os.environ.get("SECRET_PRODUCTION_KEY", "youshallnotpassanysecretkey")
+    RATE_LIMIT = int(os.environ.get("RATE_LIMIT", 150))
+    RATE_WINDOW = int(os.environ.get("RATE_WINDOW", 60))
+else:
+    SECRET_PRODUCTION_KEY = "when_the_pig_fly"
+    RATE_LIMIT = 1000
+    RATE_WINDOW = 0
+
+rate_limit_cache: Dict[str, list] = {}
+
+def is_rate_limited(ip: str) -> bool:
+    now = time.time()
+    request_times = rate_limit_cache.get(ip, [])
+    request_times = [t for t in request_times if now - t < RATE_WINDOW]
+    if len(request_times) >= RATE_LIMIT:
+        return True
+    request_times.append(now)
+    rate_limit_cache[ip] = request_times
+    return False
+
+auth_scheme = HTTPBearer(auto_error=False)
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+    if credentials is None or credentials.credentials != SECRET_PRODUCTION_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing token")
+    return True
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        ip = request.client.host
+        if is_rate_limited(ip):
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests"},
+            )
+        return await call_next(request)
 
 class FileSession:
     def __init__(self):
@@ -102,14 +146,29 @@ def is_valid_uuid4(s: str) -> bool:
 
 class BaseApplication(FastAPI):
     def __init__(self):
-        super().__init__(lifespan=self.lifespan)
-        self.add_api_route("/get_all_format", self.get_all_formats, response_model=FormatResponse, methods=["POST"])
-        self.add_api_route("/download", self.download_video, methods=["POST"])
-        self.add_api_route("/files/{session_id}", self.get_downloaded_file, methods=["GET"])
-        self.add_api_route("/geo_check", self.check_geo_block, methods=["POST"], response_model=GeoblockData)
+        super().__init__(lifespan=self.lifespan,
+                        docs_url="/docs" if IS_DEVELOPMENT else None,
+                        redoc_url="/redoc" if IS_DEVELOPMENT else None,
+                        openapi_url="/openapi.json" if IS_DEVELOPMENT else None)
+
+        self.add_api_route("/get_all_format", self.get_all_formats, response_model=FormatResponse, methods=["POST"],
+                            dependencies=[Depends(verify_token)])
+
+        self.add_api_route("/download", self.download_video, methods=["POST"]
+                            , response_model=DownloadResponse, dependencies=[Depends(verify_token)])
+
+        self.add_api_route("/files/{session_id}", self.get_downloaded_file, methods=["GET"],
+                            response_class=FileResponse)
+
+        self.add_api_route("/geo_check", self.check_geo_block, methods=["POST"], response_model=GeoblockData,
+                            dependencies=[Depends(verify_token)])
+
+        self.add_api_route("/", self.root, methods=["GET", "HEAD"])
+
         self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app", "http://localhost:5173"],
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
-        self.add_api_route("/", self.root, methods=["GET", "HEAD"])
+        self.add_middleware(RateLimitMiddleware)
+
         self.file_session = FileSession()
         self.uptime = datetime.now(timezone.utc)
 

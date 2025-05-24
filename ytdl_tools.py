@@ -1,7 +1,6 @@
 from typing import Any
 
 import yt_dlp
-from fastapi import HTTPException
 from pydantic import BaseModel
 import pathlib
 from logging import getLogger
