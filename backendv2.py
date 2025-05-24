@@ -34,6 +34,12 @@ log = getLogger(__name__)
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
+if os.environ.get("FILE_EXPIRE_TIME").isdigit():
+    FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
+else:
+    FILE_EXPIRE_TIME: int = 300
+
 IS_DEVELOPMENT = os.environ.get("DEVELOPMENT", "False").lower() == "true"
 if not IS_DEVELOPMENT:
     SECRET_PRODUCTION_KEY = os.environ.get("SECRET_PRODUCTION_KEY", "youshallnotpassanysecretkey")
@@ -93,13 +99,12 @@ class FileSession:
 
     async def auto_delete_file_task(self):
         while True:
-            timeout = 300
             await sleep(60)
             expired_sessions = []
             now = datetime.now(timezone.utc).timestamp()
 
             for session_id, (file_path, created_time) in list(self.storage.items()):
-                if now - created_time >= timeout:
+                if now - created_time >= FILE_EXPIRE_TIME:
                     if file_path.exists():
                         log.debug("Session outdated: %s", session_id)
                         rmtree(file_path)
@@ -165,6 +170,8 @@ class BaseApplication(FastAPI):
 
         self.add_api_route("/", self.root, methods=["GET", "HEAD"])
 
+        self.add_api_route("/server_config", self.get_server_configuration, methods=["GET"])
+
         self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app", "http://localhost:5173"],
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
         self.add_middleware(RateLimitMiddleware)
@@ -184,6 +191,13 @@ class BaseApplication(FastAPI):
     @staticmethod
     def generate_uuid():
         return str(uuid.uuid4())
+    
+    async def get_server_configuration(self):
+        return {
+            "FILE_EXPIRE_TIME": FILE_EXPIRE_TIME,
+            "RATE_LIMIT": RATE_LIMIT,
+            "RATE_WINDOW": RATE_WINDOW
+        }
 
     async def check_geo_block(self, request: FormatRequest):
 
@@ -210,7 +224,7 @@ class BaseApplication(FastAPI):
             raise HTTPException(status_code=400, detail="URL is required")
 
         try:
-            formats, file_name = await s2a(fetch_format_data)(url, max_audio=3, cookiefile="./cookie.txt")
+            formats, file_name = await s2a(fetch_format_data)(url, max_audio=3)
             if not formats:
                 log.error(f"Fail to load formats for {url}")
                 raise HTTPException(status_code=404, detail="No formats found")
@@ -276,6 +290,7 @@ class BaseApplication(FastAPI):
                     return FileResponse(path=f, filename=f.name, media_type='application/octet-stream')
 
         raise HTTPException(404, detail="No downloadable file found.")
+    
     async def root(self):
         beautiful_format = ""
         for route in self.routes:

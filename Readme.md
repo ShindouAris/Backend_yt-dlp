@@ -17,6 +17,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     * [`/download`](#3-post-download-protected)
     * [`/files/<session_id>`](#4-get-filessession_id)
     * [`/geo_check`](#5-post-geo_check-protected)
+    * [`/server_config`](#6-get-server_config)
 * [☁️ Hosting on Render](#hosting-on-render)
 * [📝 Notes](#notes)
 * [🔐 Security Notes](#security-notes)
@@ -48,8 +49,9 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 1.  **Python**: Python 3.8+ installed.
 2.  **pip**: Python package manager (usually comes with Python).
 3.  **Environment Variables**: Certain features and security settings are configured via environment variables (see `.env` file setup).
-4.  **(Optional) Google API Key**: For using the `/geo_check` endpoint. Must be set as `YOUTUBE_V3_APIKEY` environment variable.
-5.  **(Optional) Render Account**: If you plan to host the application on Render.
+4.  **REQUIRED** FFMPEG: for merge audio file with video file. Must be installed and available in your system's PATH. See [Install FFmpeg](#5-install-ffmpeg-required) for instructions.
+5.  **(Optional) Google API Key**: For using the `/geo_check` endpoint. Must be set as `YOUTUBE_V3_APIKEY` environment variable.
+6.  **(Optional) Render Account**: If you plan to host the application on Render.
 
 ---
 
@@ -105,6 +107,9 @@ RATE_LIMIT=150
 # Time window in seconds for rate limiting.
 # Default: 60 (production), 0 (development, effectively disabling active rate limiting by window)
 RATE_WINDOW=60
+
+# Time in seconds before downloaded files are automatically deleted
+FILE_EXPIRE_TIME=300
 ```
 - The application loads these variables using `python-dotenv`.
 - If `DEVELOPMENT` is `true`, API documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) will be available. These are disabled in production mode.
@@ -132,7 +137,89 @@ To download videos from websites requiring authentication (e.g., YouTube private
 > *   The very first line of the file **must** be either `# HTTP Cookie File` or `# Netscape HTTP Cookie File`.
 > *   The path to this cookie file is specified in `backendv2.py` as `cookiefile="./cookie.txt"`.
 
-### 5. Run the Application Locally
+### 5. Install FFMPEG `[REQUIRED]`
+
+FFMPEG is required for merging audio and video files. Without it, downloaded videos may lack sound. Follow the instructions for your operating system:
+
+#### Windows
+
+1. **Using Chocolatey (Recommended)**:
+   ```bash
+   # Install Chocolatey first if you haven't (Run PowerShell as Administrator)
+   Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+   
+   # Then install ffmpeg
+   choco install ffmpeg
+   ```
+
+2. **Manual Installation**:
+   - Download the latest FFMPEG build from [https://www.gyan.dev/ffmpeg/builds/](https://www.gyan.dev/ffmpeg/builds/) (recommended: `ffmpeg-git-full.7z`)
+   - Extract the archive
+   - Add the `bin` folder to your System's PATH:
+     1. Right-click on 'This PC' or 'My Computer'
+     2. Click 'Properties'
+     3. Click 'Advanced system settings'
+     4. Click 'Environment Variables'
+     5. Under 'System Variables', find and select 'Path'
+     6. Click 'Edit'
+     7. Click 'New'
+     8. Add the path to ffmpeg's bin folder
+     9. Click 'OK' on all windows
+
+#### macOS
+
+1. **Using Homebrew (Recommended)**:
+   ```bash
+   # Install Homebrew first if you haven't
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   
+   # Then install ffmpeg
+   brew install ffmpeg
+   ```
+
+2. **Using MacPorts**:
+   ```bash
+   sudo port install ffmpeg
+   ```
+
+#### Linux
+
+1. **Ubuntu/Debian**:
+   ```bash
+   sudo apt update
+   sudo apt install ffmpeg
+   ```
+
+2. **Fedora**:
+   ```bash
+   sudo dnf install ffmpeg
+   ```
+
+3. **CentOS/RHEL**:
+   ```bash
+   # Enable RPM Fusion repositories first
+   sudo dnf install --nogpgcheck https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
+   sudo dnf install --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$(rpm -E %rhel).noarch.rpm
+   
+   # Then install ffmpeg
+   sudo dnf install ffmpeg
+   ```
+
+4. **Arch Linux**:
+   ```bash
+   sudo pacman -S ffmpeg
+   ```
+
+#### Verify Installation
+
+After installation, verify FFMPEG is properly installed by running:
+```bash
+ffmpeg -version
+```
+
+You should see version information if the installation was successful.
+
+### 6. Run the Application Locally
 
 ```bash
 python backendv2.py
@@ -342,8 +429,6 @@ if session_id:
 else:
     print("Could not proceed to download file as session_id was not obtained from the /download step.")
 
-```
-
 ### 5. **POST** `/geo_check` `[Protected]`
 
 Checks if a YouTube video is geo-restricted. Requires Bearer token authentication and `YOUTUBE_V3_APIKEY`.
@@ -357,7 +442,7 @@ Checks if a YouTube video is geo-restricted. Requires Bearer token authenticatio
 - **Response** (JSON, `GeoblockData`):
   ```json
   {
-    "url": "https://www.youtube.com/watch?v=some_video_id", // Or just video_id based on GeoblockData model
+    "url": "https://www.youtube.com/watch?v=some_video_id", 
     "allowed_country": ["US", "CA"],
     "blocked_country": ["DE", "FR"]
   }
@@ -366,6 +451,24 @@ Checks if a YouTube video is geo-restricted. Requires Bearer token authenticatio
 - **Error Responses**:
     - `401 Unauthorized`: If `YOUTUBE_V3_APIKEY` is not configured on the server.
     - `403 Forbidden`: Invalid or missing token.
+
+### 6. **GET** `/server_config`
+
+Returns the current server configuration settings.
+
+- **Response** (JSON):
+  ```json
+  {
+    "FILE_EXPIRE_TIME": 300,    // Time in seconds before downloaded files are deleted
+    "RATE_LIMIT": 150,         // Maximum requests allowed per IP within RATE_WINDOW
+    "RATE_WINDOW": 60          // Time window in seconds for rate limiting
+  }
+  ```
+
+- **Example Usage**:
+  ```bash
+  curl http://127.0.0.1:8000/server_config
+  ```
 
 ---
 
@@ -475,7 +578,7 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 5.  **Cookies Not Working / `yt-dlp` errors (e.g., 429 from YouTube, authentication issues)**:
     *   Ensure `cookies.txt` is present in the project's root (or correctly configured as a secret file on Render).
     *   Verify `cookies.txt` format (Netscape, first line `# HTTP Cookie File` or `# Netscape HTTP Cookie File`).
-    *   Cookies expire. Re-export fresh cookies using the private/incognito window method.
+    *   Cookies expired. Re-export fresh cookies using the private/incognito window method. [THE ]
 6.  **`File not found` (404 for `/files/<session_id>` with detail "No downloadable file found.")**:
     *   The `session_id` (even if a valid UUID) might be incorrect, the corresponding download might have failed, or the file was deleted by the auto-cleanup (default 5 mins).
     *   Check server logs for download errors during the `/download` step.
@@ -486,6 +589,16 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
     *   For 401: Confirm `YOUTUBE_V3_APIKEY` environment variable is correctly set and the key is valid/enabled.
     *   For Pydantic Error: The `is_geo_restricted` function might return data incompatible with the `GeoblockData` model.
 
+9. **Missing audio in downloaded videos or merge errors**
+   * Ensure `ffmpeg` is installed and available in your system's `PATH`.
+   * Run `ffmpeg -version` to verify it is correctly installed.
+   * If the command is not recognized, recheck your installation steps.
+   * If `ffmpeg` is installed but your video still has no sound:
+     - Double-check the selected format: the combination may not include an audio stream.
+     - Use `/get_all_format` to confirm whether audio-only or combined formats are available.
+     - Some videos may be uploaded without an audio track (e.g., raw footage, livestreams).
+
+
 ---
 
 ## FAQ
@@ -494,10 +607,10 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
     -   Call `/get_all_format` to list formats. Use the `format` string (e.g., `"137+140"`) from that response in the `/download` request body. Defaults to `"bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"` if `format` is omitted.
 
 2.  **Can I download playlists?**
-    -   No, this API is for single video downloads.
+    -   No, this API is for single video downloads (~~Planning for multiple download later~~).
 
 3.  **How are large files handled? Are there size limits?**
-    -   Files are temporarily stored on the server. Limits depend on server disk space (ephemeral on Render's free tier). Auto-deleted after 5 minutes. For longer storage/larger files, modify `timeout` in `FileSession` or consider plans with more disk.
+    -   Files are temporarily stored on the server. Limits depend on server disk space (ephemeral on Render's free tier). Auto-deleted after 5 minutes (default). For longer storage/larger files, modify `FILE_EXPIRE_TIME` in `ENVIRONMENT` or `.env`.
 
 4.  **How do I get the `cookies.txt` file?**
     -   Refer to "Local Setup" section: "4. (Optional) Get `cookies.txt`...". Key steps: use Cookie-Editor, private/incognito window, export Netscape format, save as `cookies.txt` with correct first line.
@@ -508,4 +621,3 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 This project is licensed under the MIT License. (Assuming MIT License as is common for such open-source projects. If a specific `LICENSE` file exists in the repository, it takes precedence.)
 
 <img src="https://i.pinimg.com/736x/9c/d9/2f/9cd92f33e4c3e47b30697e3e587fcc99.jpg" alt="gomen"/>
-```
