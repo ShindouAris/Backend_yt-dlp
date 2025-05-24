@@ -4,7 +4,7 @@ import yt_dlp
 from pydantic import BaseModel
 import pathlib
 from logging import getLogger
-from regex_manager import get_provider_from_url
+from regex_manager import get_provider_from_url, is_youtube_playlist, resolve_url
 
 log = getLogger(__name__)
 
@@ -43,7 +43,7 @@ default_formatData = [
     )
 ]
 
-def fetch_format_data(url: str, max_audio: int = 3, cookiefile: str | None = "./cookie.txt") -> tuple[
+def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
     list[FormatInfo], Any
 ]:
 
@@ -52,8 +52,16 @@ def fetch_format_data(url: str, max_audio: int = 3, cookiefile: str | None = "./
         "no_warnings": True,
         "logger": log,
     }
-    if cookiefile:
+
+    platform = get_provider_from_url(url)
+    if platform:
+        cookiefile = get_cookie_file(platform)
         opt["cookiefile"] = cookiefile
+    else:
+        opt["cookiefile"] = "./yt_dlp_cookie.txt"
+
+    if platform == "youtube" and is_youtube_playlist(url):
+        url = resolve_url(url)
 
     with yt_dlp.YoutubeDL(opt) as ydl:
         try:
@@ -158,6 +166,10 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
     else:
         log.warning(f"Platform not recognized for URL: {url}. Using default cookie file.")
         ydl_opts["cookiefile"] = "./yt_dlp_cookie.txt"
+
+    # Refuse to download playlists, resolve to the first video in the playlist
+    if platform == "youtube" and is_youtube_playlist(url):
+        url = resolve_url(url)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
