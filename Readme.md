@@ -151,6 +151,11 @@ To download videos from websites requiring authentication (e.g., YouTube private
 
 #### Steps to get `cookies.txt` from YouTube:
 
+> [!CAUTION]
+> - **Security Risk**: Using cookies with high traffic can lead to YouTube account bans
+> - **Best Practice**: Use a throwaway account or avoid using cookies entirely
+> - **Hosting Limitation**: YouTube downloads may fail on cloud platforms (Render, Azure, GitLab, etc.) if cookie is not use
+
 1.  Install the **Cookie-Editor** browser extension:
     *   [Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
     *   [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
