@@ -1,9 +1,9 @@
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, JSONResponse
+from fastapi.responses import FileResponse, Response, JSONResponse, RedirectResponse
 
 from collections import deque
 import uuid
@@ -23,6 +23,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from ytdl_tools import fetch_format_data, run_yt_dlp_download
 from geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
 from request_class import DownloadRequest, FormatRequest, FormatResponse, DownloadResponse
+from r2_storage import R2Storage
+from url_cache import URLCache
 
 from logging_utils import LOGGING_CONFIG
 from logging import getLogger
@@ -85,12 +87,47 @@ class FileSession:
         self.sessions = deque()
         self.storage: dict[str, tuple[pathlib.Path, float]] = {}
         self._task = None
+        self.r2_storage = R2Storage()
+        self.url_cache = URLCache()
 
-    def add_session(self, session_id, file_path: pathlib.Path =None):
+    def add_session(self, session_id, file_path: pathlib.Path = None, url: str = None, format_option: str = None):
+        """Add a new session with associated file path"""
         self.sessions.append(session_id)
         if file_path:
-            self.storage[session_id] = (file_path, datetime.now(timezone.utc).timestamp())
-        log.debug("Added session: %s", session_id)
+            created_time = datetime.now(timezone.utc).timestamp()
+            
+            # If R2 storage is enabled, upload the file and then delete local copy
+            if self.r2_storage.enabled and url and format_option:
+                first_file = resolve_file_name_from_folder(str(file_path))
+                full_file_path = file_path / first_file
+                object_name = f"{session_id}/{first_file}"
+                
+                if self.r2_storage.upload_file(str(full_file_path), object_name):
+                    # Cache the file information
+                    self.url_cache.cache_file(
+                        url,
+                        format_option,
+                        {
+                            "session_id": session_id,
+                            "object_name": object_name,
+                            "filename": first_file
+                        },
+                        FILE_EXPIRE_TIME
+                    )
+                    # Delete local file after successful upload
+                    rmtree(file_path)
+                    # Store only the filename for reference
+                    self.storage[session_id] = (pathlib.Path(first_file), created_time)
+                else:
+                    # If R2 upload fails, keep local file as fallback
+                    self.storage[session_id] = (file_path, created_time)
+            else:
+                # If R2 is not enabled, store locally with full path
+                self.storage[session_id] = (file_path, created_time)
+
+            log.debug("Added session: %s with storage type: %s", 
+                     session_id, 
+                     "R2" if self.r2_storage.enabled else "local")
 
     def __pop_session(self):
         if self.sessions:
@@ -105,31 +142,116 @@ class FileSession:
 
             for session_id, (file_path, created_time) in list(self.storage.items()):
                 if now - created_time >= FILE_EXPIRE_TIME:
-                    if file_path.exists():
-                        log.debug("Session outdated: %s", session_id)
-                        rmtree(file_path)
-                    expired_sessions.append(session_id)
+                    try:
+                        # Handle local storage cleanup
+                        if not self.r2_storage.enabled:
+                            # For local storage, file_path is the full path to the session directory
+                            full_path = file_path if isinstance(file_path, pathlib.Path) else DOWNLOAD_FOLDER / session_id
+                            if full_path.exists():
+                                log.debug("Cleaning up local session: %s", session_id)
+                                rmtree(full_path)
+                        
+                        # Handle R2 storage cleanup
+                        elif self.r2_storage.enabled:
+                            # For R2 storage, file_path is just the filename
+                            filename = file_path.name if isinstance(file_path, pathlib.Path) else file_path
+                            object_name = f"{session_id}/{filename}"
+                            self.r2_storage.delete_file(object_name)
+                        
+                        # Handle cache cleanup (both Redis and in-memory)
+                        if self.url_cache.enabled:
+                            self.url_cache.remove_all_by_session(session_id)
+                        
+                        expired_sessions.append(session_id)
+                        
+                    except Exception as e:
+                        log.error(f"Error during cleanup for session {session_id}: {e}")
 
+            # Remove expired sessions from tracking
             for session_id in expired_sessions:
-                self.sessions.remove(session_id)
-                del self.storage[session_id]
+                try:
+                    self.sessions.remove(session_id)
+                    del self.storage[session_id]
+                except Exception as e:
+                    log.error(f"Error removing session {session_id} from tracking: {e}")
 
     def clear_sessions(self):
-        log.debug("Clearing all sessions...")
-        s = 0
-        while self.sessions:
-            session_id = self.__pop_session()
-            file_path = self.storage.get(session_id)
-            if file_path and file_path[0].exists():
-                rmtree(file_path[0])
-                del self.storage[session_id]
-            s += 1
+        """
+        Emergency cleanup method to clear all sessions and their associated resources.
+        This is important to prevent storage leaks and should be called during shutdown.
+        """
+        log.info("Emergency cleanup: Clearing all sessions...")
+        cleaned = 0
+        errors = 0
 
-        log.debug("Cleared %d sessions", s)
+        while self.sessions:
+            try:
+                session_id = self.__pop_session()
+                file_path = self.storage.get(session_id)
+                
+                if file_path:
+                    try:
+                        # Handle local storage cleanup
+                        if not self.r2_storage.enabled:
+                            # For local storage, file_path[0] is the full path to the session directory
+                            full_path = file_path[0] if isinstance(file_path[0], pathlib.Path) else DOWNLOAD_FOLDER / session_id
+                            if full_path.exists():
+                                log.debug("Cleaning up local session: %s", session_id)
+                                rmtree(full_path)
+                        
+                        # Handle R2 storage cleanup
+                        elif self.r2_storage.enabled:
+                            # For R2 storage, file_path[0] is just the filename
+                            filename = file_path[0].name if isinstance(file_path[0], pathlib.Path) else file_path[0]
+                            object_name = f"{session_id}/{filename}"
+                            self.r2_storage.delete_file(object_name)
+                        
+                        # Always clean up cache
+                        if self.url_cache.enabled:
+                            self.url_cache.remove_all_by_session(session_id)
+                        
+                        del self.storage[session_id]
+                        cleaned += 1
+                        
+                    except Exception as e:
+                        errors += 1
+                        log.error(f"Error cleaning up session {session_id}: {e}")
+                        
+            except Exception as e:
+                errors += 1
+                log.error(f"Error during session cleanup: {e}")
+
+        log.info("Emergency cleanup completed: %d sessions cleaned, %d errors", cleaned, errors)
+        
+        # Final safety check - clean up downloads directory if it exists
+        try:
+            if DOWNLOAD_FOLDER.exists():
+                for session_dir in DOWNLOAD_FOLDER.iterdir():
+                    if session_dir.is_dir():
+                        try:
+                            rmtree(session_dir)
+                            log.debug("Cleaned up orphaned session directory: %s", session_dir)
+                        except Exception as e:
+                            log.error(f"Error cleaning up orphaned directory {session_dir}: {e}")
+        except Exception as e:
+            log.error(f"Error during final downloads directory cleanup: {e}")
 
     def start(self):
         if self._task is None:
             self._task = create_task(self.auto_delete_file_task())
+
+    def get_file_url(self, session_id: str) -> Optional[str]:
+        """Get the file URL, either from R2 or local storage"""
+        file_path = self.storage.get(session_id)
+        if not file_path:
+            return None
+            
+        if self.r2_storage.enabled:
+            # When using R2, file_path[0] is just the filename
+            filename = file_path[0].name if isinstance(file_path[0], pathlib.Path) else file_path[0]
+            object_name = f"{session_id}/{filename}"
+            return self.r2_storage.get_presigned_url(object_name, FILE_EXPIRE_TIME)
+        return None
 
 def resolve_file_name_from_folder(path: str) -> str:
     """
@@ -186,11 +308,14 @@ class BaseApplication(FastAPI):
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         """
-        Starts the auto-delete task for files.
+        Handles application startup and shutdown.
+        Starts the auto-delete task and ensures proper cleanup on shutdown.
         """
-        self.file_session.start()
-        yield None
-        self.file_session.clear_sessions()
+        try:
+            self.file_session.start()
+            yield None
+        finally:
+            self.file_session.clear_sessions()
 
     @staticmethod
     def generate_uuid():
@@ -247,28 +372,73 @@ class BaseApplication(FastAPI):
         if not url:
             raise HTTPException(status_code=400, detail="URL is required")
 
+        # Check cache first
+        cached_file = self.file_session.url_cache.get_cached_file(url, format_option)
+        if cached_file:
+            if self.file_session.r2_storage.enabled:
+                presigned_url = self.file_session.r2_storage.get_presigned_url(
+                    cached_file["object_name"],
+                    FILE_EXPIRE_TIME
+                )
+                if presigned_url:
+                    return DownloadResponse(
+                        message="Download completed (cached)",
+                        filename=cached_file["filename"],
+                        download_link=f"/files/{cached_file['session_id']}",
+                    )
+
         session_id = self.generate_uuid()
-
         output = pathlib.Path(os.path.join(DOWNLOAD_FOLDER / session_id))
-
         output.mkdir(parents=True, exist_ok=True)
+
         try:
             result = await s2a(run_yt_dlp_download)(url, format_option, output)
 
             if result["success"]:
                 filename = resolve_file_name_from_folder(str(output))
-                self.file_session.add_session(session_id, output)
+                full_file_path = output / filename
+
+                # If R2 storage is enabled, try to upload the file
+                if self.file_session.r2_storage.enabled:
+                    object_name = f"{session_id}/{filename}"
+                    if self.file_session.r2_storage.upload_file(str(full_file_path), object_name):
+                        # File uploaded to R2 successfully, delete local copy
+                        rmtree(output)
+                        # Cache the file information
+                        self.file_session.url_cache.cache_file(
+                            url,
+                            format_option,
+                            {
+                                "session_id": session_id,
+                                "object_name": object_name,
+                                "filename": filename
+                            },
+                            FILE_EXPIRE_TIME
+                        )
+                        # Store only filename in session
+                        self.file_session.add_session(session_id, pathlib.Path(filename))
+                    else:
+                        # R2 upload failed, keep local file as fallback
+                        self.file_session.add_session(session_id, output)
+                else:
+                    # R2 not enabled, store locally
+                    self.file_session.add_session(session_id, output)
+
                 return DownloadResponse(
                     message="Download completed",
                     filename=filename,
                     download_link=f"/files/{session_id}",
                 )
             else:
+                if output.exists():
+                    rmtree(output)
                 return Response(
                     content="Download failed",
                     status_code=500
                 )
         except yt_dlp.utils.DownloadError:
+            if output.exists():
+                rmtree(output)
             return Response(
                 content="Download failed",
                 status_code=500,
@@ -277,6 +447,12 @@ class BaseApplication(FastAPI):
     async def get_downloaded_file(self, session_id: str):
         if not is_valid_uuid4(session_id):
             raise HTTPException(400, detail="Invalid session ID")
+
+        # Check if we have an R2 URL
+        if self.file_session.r2_storage.enabled:
+            r2_url = self.file_session.get_file_url(session_id)
+            if r2_url:
+                return RedirectResponse(url=r2_url)
 
         base_dir = (PROJECT_ROOT / DOWNLOAD_FOLDER).resolve()
         requested_path = (base_dir / session_id).resolve()

@@ -9,3 +9,5 @@ colorama
 aiohttp
 pycountry
 starlette
+boto3>=1.26.0
+redis>=4.5.0
