@@ -51,6 +51,7 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
         "quiet": True,
         "no_warnings": True,
         "logger": log,
+        "ignoreerrors": True,
     }
 
     platform = get_provider_from_url(url)
@@ -131,6 +132,19 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
                 )
             )
 
+        for v in video_formats:
+            label = f"Video only: {v.get('height')}p ({v.get('ext')})"
+            result.append(
+                FormatInfo(
+                    type="video-only",
+                    format=v['format_id'],
+                    label=label,
+                    video_format=v['format_id'],
+                    audio_format=None,
+                    note=v.get("format_note")
+                )
+            )
+
         if len(result) < 1:
             result = default_formatData
 
@@ -157,7 +171,7 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
         'no_warnings': True,
         'simulate': False,
         'extract_flat': False,
-        'logger': log
+        'logger': log,
     }
     platform = get_provider_from_url(url)
     if platform:

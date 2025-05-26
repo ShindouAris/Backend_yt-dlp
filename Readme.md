@@ -19,6 +19,9 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     * [`/files/<session_id>`](#4-get-filessession_id)
     * [`/geo_check`](#5-post-geo_check-protected)
     * [`/server_config`](#6-get-server_config)
+* [☁️ Storage Configuration](#storage-configuration)
+    * [R2 Storage](#r2-storage)
+    * [URL Caching](#url-caching)
 * [☁️ Hosting on Render](#hosting-on-render)
 * [📝 Notes](#notes)
 * [🔐 Security Notes](#security-notes)
@@ -33,7 +36,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 - **Download Videos**: Download videos using `yt-dlp` with user-selected formats (protected by Bearer token).
 - **Geo-restriction Check**: Check if a YouTube video is geo-restricted (protected by Bearer token, requires Google API Key).
 - **Session Management**: Each download is associated with a unique session ID.
-- **Automatic File Cleanup**: Downloaded files are automatically deleted after a configurable timeout (default: 5 minutes).
+- **Automatic File Cleanup**: Downloaded files are automatically deleted after a configurable timeout (default: 30 minutes).
 - **Cookie Support**: Uses `cookies.txt` for authenticated downloads and to help bypass robot checks.
 - **Rate Limiting**: IP-based rate limiting to prevent abuse.
 - **Bearer Token Authentication**: Secures download and geo-check endpoints.
@@ -42,6 +45,8 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     - Configurable secret key, rate limits, and rate window via environment variables.
 - **Secure File Serving**: Validates session IDs (UUID4) and protects against path traversal.
 - **CORS Enabled**: Allows requests from specified origins.
+- **R2 Storage Integration**: Optional Cloudflare R2 storage for efficient file handling.
+- **URL Caching**: Redis or in-memory caching for faster repeat downloads.
 
 ---
 
@@ -141,9 +146,21 @@ RATE_WINDOW=60
 
 # Time in seconds before downloaded files are automatically deleted
 FILE_EXPIRE_TIME=300
+
+# CORS Configuration
+# Multiple origins can be specified using || as separator (e.g., "http://localhost:3000||https://example.com")
+# Use "*" to allow all origins (not recommended for production)
+ALLOWED_ORIGINS=*
+
+# Forwarded Origins Configuration for Uvicorn
+# Multiple origins can be specified using || as separator
+# Use "*" to allow all origins (not recommended for production)
+FORWARDED_ORIGINS=*
 ```
 - The application loads these variables using `python-dotenv`.
 - If `DEVELOPMENT` is `true`, API documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) will be available. These are disabled in production mode.
+- `ALLOWED_ORIGINS` controls which domains can access your API through CORS. For production, specify exact domains.
+- `FORWARDED_ORIGINS` controls which origins Uvicorn will trust for forwarded requests. Important for proper proxy handling.
 
 ### 4. (Required for youtube) Get `cookies.txt` for `Authenticated / pass robot check` Youtube Downloads
 
@@ -510,6 +527,95 @@ Returns the current server configuration settings.
 
 ---
 
+## Storage Configuration
+
+### R2 Storage
+
+The application supports Cloudflare R2 storage for efficient file handling. When enabled, downloaded files are stored in R2 instead of locally, reducing server storage usage and improving reliability.
+
+#### Configuration
+
+Add the following to your `.env` file:
+
+```env
+# R2 Storage Configuration
+USE_R2_STORAGE=true
+R2_ACCOUNT_ID=your_account_id
+R2_ACCESS_KEY_ID=your_access_key_id
+R2_SECRET_ACCESS_KEY=your_secret_access_key
+R2_BUCKET_NAME=your_bucket_name
+```
+
+#### How It Works
+
+1. **File Storage**:
+   - When R2 is enabled, files are uploaded to R2 immediately after download
+   - Local files are deleted after successful R2 upload
+   - Files are served via presigned URLs from R2
+   - Local storage is used as fallback only if R2 upload fails
+
+2. **File Lifecycle**:
+   - Files in R2 are automatically deleted after the configured expiration time
+   - Session management tracks both local and R2 stored files
+   - Cleanup processes handle both storage types seamlessly
+
+3. **Benefits**:
+   - Reduced server storage usage
+   - Improved reliability through cloud storage
+   - Better scalability for multiple server instances
+   - Efficient bandwidth usage through presigned URLs
+
+### URL Caching
+
+The application includes a caching system that can use either Redis or in-memory storage to cache download information and prevent unnecessary re-downloads.
+
+#### Configuration
+
+Add the following to your `.env` file:
+
+```env
+# Redis Cache Configuration
+USE_REDIS_CACHE=true
+REDIS_HOST=your_redis_host
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+```
+
+If `USE_REDIS_CACHE` is set to `false`, the system will automatically use in-memory caching.
+
+#### How It Works
+
+1. **Cache Storage**:
+   - Redis for distributed caching (recommended for production)
+   - In-memory fallback for single-instance deployments
+   - Configurable cache expiration time (default: 30 minutes)
+
+2. **Cached Information**:
+   - Download URLs and format options
+   - File locations in R2 storage
+   - Session IDs and filenames
+   - Expiration timestamps
+
+3. **Benefits**:
+   - Faster response times for repeated downloads
+   - Reduced load on source servers
+   - Efficient resource utilization
+   - Seamless integration with R2 storage
+
+#### Cache Behavior
+
+1. **New Downloads**:
+   - Check cache for existing download
+   - If found and valid, serve from R2 storage
+   - If not found or expired, proceed with new download
+
+2. **Cache Invalidation**:
+   - Automatic expiration after configured time
+   - Manual invalidation through API if needed
+   - Cleanup of expired entries during regular maintenance
+
+---
+
 ## Hosting on Render
 
 ### 1. Create a Render Account
@@ -652,6 +758,22 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 
 4.  **How do I get the `cookies.txt` file?**
     -   Refer to "Local Setup" section: "4. (Optional) Get `cookies.txt`...". Key steps: use Cookie-Editor, private/incognito window, export Netscape format, save as `cookies.txt` with correct first line.
+
+10. **How does R2 storage work with the API?**
+    - When enabled, files are stored in Cloudflare R2 instead of locally
+    - Files are served via presigned URLs with 30-minute validity
+    - Local storage is used as fallback only if R2 upload fails
+    - Configure R2 credentials in `.env` file
+
+11. **What's the difference between Redis and in-memory caching?**
+    - Redis cache persists across server restarts and works with multiple instances
+    - In-memory cache is faster but limited to single instance and cleared on restart
+    - Redis recommended for production, in-memory suitable for development
+
+12. **Can I use the API without R2 storage?**
+    - Yes, set `USE_R2_STORAGE=false` in `.env`
+    - Files will be stored locally with automatic cleanup
+    - All functionality remains the same, just using local storage
 
 ---
 ## License
