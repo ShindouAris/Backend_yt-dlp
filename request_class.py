@@ -9,7 +9,7 @@ class DownloadResponse(BaseModel):
     download_link: str | None = None
     details: str | None = None
     yt_dlp_output: str | None = None
-    expires_at: int | None = None
+    expires_at: float | None = None
     expires_in: int | None = None
 
 class DownloadRequest(BaseModel):
