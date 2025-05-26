@@ -40,6 +40,21 @@ default_formatData = [
         video_format="best",
         audio_format="best",
         note="Default data, no format found"
+    ),
+    FormatInfo(
+        type="audio-only",
+        format=f"bestaudio",
+        label="Best audio setting",
+        video_format=None,
+        audio_format="best",
+        note="Default data, no format found"
+    ),
+    FormatInfo(
+        type="video-only",
+        format=f"bestvideo",
+        label="Best video setting",
+        video_format="best",
+        audio_format=None,
     )
 ]
 
@@ -91,19 +106,21 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
         result: list[FormatInfo] = []
 
         for v in sorted(video_formats, key=lambda x: x.get("height") or 0, reverse=True):
+            log.debug(f"Video format: {v}")
+            log.debug(f"Audio formats: {audio_formats}")
             video_height = v.get("height", 0)
             video_ext = v.get("ext")
 
             if video_ext == "webm" and video_height <= 1080:
                 continue
 
-            if v.get("format_note") is None:
+            if v.get("format_note") is None and platform == "youtube":
                 continue # skip shit
 
             for a in audio_formats:
                 audio_bitrate_kbps = round(a.get('abr', 0), 1)
 
-                if audio_bitrate_kbps <= 66.7:
+                if audio_bitrate_kbps <= 66.7 and platform == "youtube":
                     continue
 
                 label = f"{video_height}p ({video_ext}) [Audio: {audio_bitrate_kbps}Kbps] {'[PREMIUM]' if str(v.get('format_note')).lower() == 'premium' else ''}".strip()
