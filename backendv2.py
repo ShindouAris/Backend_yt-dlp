@@ -3,7 +3,7 @@ from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, Response, JSONResponse, RedirectResponse, HTMLResponse
 
 from collections import deque
 import uuid
@@ -522,7 +522,7 @@ class BaseApplication(FastAPI):
                 if f.is_file():
                     return FileResponse(path=f, filename=f.name, media_type='application/octet-stream')
 
-        raise HTTPException(404, detail="No downloadable file found.")
+        return HTMLResponse(content=open("template/gomen.html").read())
     
     async def root(self):
         beautiful_format = ""
