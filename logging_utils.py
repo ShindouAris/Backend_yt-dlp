@@ -151,7 +151,7 @@ LOGGING_CONFIG = {
         }
     },
     "root": {
-        "level": "INFO",
+        "level": "DEBUG",
         "handlers": ["info_console", "warning_console", "error_console", "debug_console", "file"]
     }
 }
