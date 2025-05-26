@@ -91,6 +91,49 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
         if not raw_formats:
             print("No formats found in extracted info.")
             return [], filename
+        
+        log.debug(f"Starting to process formats for {platform} platform")
+        
+        if platform == "tiktok":
+            video_formats = [
+                f for f in raw_formats
+                if f.get("vcodec") != "none" and f.get("height") is not None
+            ]
+            video_formats = sorted(video_formats, key=lambda x: (x.get("height") or 0, x.get("tbr") or 0), reverse=True)
+
+            result: list[FormatInfo] = []
+            seen_resolutions = set()
+
+            for f in video_formats:
+                video_height = f.get("height", 0)
+                video_ext = f.get("ext")
+                video_codec = f.get("vcodec", "unknown")
+                resolution_key = f"{video_height}p_{video_codec}"
+
+                # Skip duplicate resolutions with same codec
+                if resolution_key in seen_resolutions:
+                    continue
+                
+                seen_resolutions.add(resolution_key)
+
+                # Create a more descriptive label
+                label = f"{video_height}p ({video_codec})"
+
+                result.append(
+                    FormatInfo(
+                        type="video+audio",
+                        format=f['format_id'],
+                        label=label,
+                        video_format=f['format_id'],
+                        audio_format="default - muxed", 
+                        note=f.get("format_note") or f"Resolution: {f.get('width')}x{f.get('height')}"
+                    )
+                )
+
+            if len(result) < 1:
+                result = default_formatData
+
+            return result, filename
 
         video_formats = [
             f for f in raw_formats
@@ -106,8 +149,6 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
         result: list[FormatInfo] = []
 
         for v in sorted(video_formats, key=lambda x: x.get("height") or 0, reverse=True):
-            log.debug(f"Video format: {v}")
-            log.debug(f"Audio formats: {audio_formats}")
             video_height = v.get("height", 0)
             video_ext = v.get("ext")
 
