@@ -1,0 +1,69 @@
+{
+    "name": "there's a thing called being ＂normal＂ but people ain't acting with it... [7507432333729991954].mp4",
+    "formats": [
+        {
+            "type": "video+audio",
+            "format": "bytevc1_1080p_238377-0",
+            "label": "1920p (mp4) [Muxed: 0kbps]",
+            "video_format": "bytevc1_1080p_238377-0",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "bytevc1_1080p_238377-1",
+            "label": "1920p (mp4) [Muxed: 0kbps]",
+            "video_format": "bytevc1_1080p_238377-1",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "bytevc1_720p_192696-0",
+            "label": "1280p (mp4) [Muxed: 0kbps]",
+            "video_format": "bytevc1_720p_192696-0",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "bytevc1_720p_192696-1",
+            "label": "1280p (mp4) [Muxed: 0kbps]",
+            "video_format": "bytevc1_720p_192696-1",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "h264_540p_257902-0",
+            "label": "1024p (mp4) [Muxed: 0kbps]",
+            "video_format": "h264_540p_257902-0",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "h264_540p_257902-1",
+            "label": "1024p (mp4) [Muxed: 0kbps]",
+            "video_format": "h264_540p_257902-1",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "bytevc1_540p_136579-0",
+            "label": "1024p (mp4) [Muxed: 0kbps]",
+            "video_format": "bytevc1_540p_136579-0",
+            "audio_format": null,
+            "note": null
+        },
+        {
+            "type": "video+audio",
+            "format": "bytevc1_540p_136579-1",
+            "label": "1024p (mp4) [Muxed: 0kbps]",
+            "video_format": "bytevc1_540p_136579-1",
+            "audio_format": null,
+            "note": null
+        }
+    ]
+}
