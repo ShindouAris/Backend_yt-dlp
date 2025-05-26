@@ -29,6 +29,8 @@ from url_cache import URLCache
 from logging_utils import LOGGING_CONFIG
 from logging import getLogger
 
+import random
+
 
 load_dotenv()
 log = getLogger(__name__)
@@ -38,6 +40,7 @@ DOWNLOAD_FOLDER = pathlib.Path('downloads')
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split("||")
 UVICORN_FORWARDED_ORIGINS = os.environ.get("FORWARDED_ORIGINS", "*").split("||")
+ENABLE_TROLLING_ROUTE = os.environ.get("ENABLE_TROLLING_ROUTE", "False").lower() == "true"
 
 if os.environ.get("FILE_EXPIRE_TIME") is not None and os.environ.get("FILE_EXPIRE_TIME").isdigit():
     FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
@@ -300,6 +303,12 @@ class BaseApplication(FastAPI):
 
         self.add_api_route("/server_config", self.get_server_configuration, methods=["GET"])
 
+        if ENABLE_TROLLING_ROUTE:
+            self.add_api_route("/.env", self.fake_environment, methods=["GET"])
+
+        self.add_exception_handler(404, self.error_handler)
+        self.add_exception_handler(405, self.error_handler)
+
         self.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
         self.add_middleware(RateLimitMiddleware)
@@ -322,6 +331,44 @@ class BaseApplication(FastAPI):
     @staticmethod
     def generate_uuid():
         return str(uuid.uuid4())
+    
+    # ATTACKER TROLLING ROUTE
+    async def fake_environment(self):
+        messages = [
+            "Yo mon frère, y'a rien ici. Va coder au lieu de fouiller. 🗿🇫🇷",
+            "Eh oh, t'as cru trouver quoi ici ? Retourne bosser ! 🥖",
+            "Bien essayé mon gars, mais y'a que des baguettes ici. 🥖🇫🇷",
+            "Mdr, t'es vraiment en train de chercher des .env ? Trop fort ! 😂",
+            "Nope ! Pas de fichiers secrets ici, juste du saucisson. 🍖",
+            "Oh là là, encore un petit malin qui fouine ! Allez, retourne coder. 🐌",
+            "C'est pas bien de fouiller comme ça ! Tiens, prends un croissant 🥐",
+            "404 Baguette Not Found. Réessaie plus tard ! 🥖❌"
+        ]
+        return {
+            "message": random.choice(messages)
+        }
+    
+    async def error_handler(self, request: Request, exc: Exception):
+        messages = [
+            "Yo mon frère, y'a rien ici. Va coder au lieu de fouiller. 🗿🇫🇷",
+            "Eh oh, t'as cru trouver quoi ici ? Retourne bosser ! 🥖",
+            "Bien essayé mon gars, mais y'a que des baguettes ici. 🥖🇫🇷",
+            "Mdr, t'es vraiment en train de chercher des .env ? Trop fort ! 😂",
+            "Nope ! Pas de fichiers secrets ici, juste du saucisson. 🍖",
+            "Oh là là, encore un petit malin qui fouine ! Allez, retourne coder. 🐌",
+            "C'est pas bien de fouiller comme ça ! Tiens, prends un croissant 🥐",
+            "404 Baguette Not Found. Réessaie plus tard ! 🥖❌"
+        ]
+        route = request.url.path
+        ip = request.client.host
+
+        log.warning(f"[{ip}] - [{route}] - [{exc}]")
+
+
+        return Response(
+            content=random.choice(messages),
+            status_code=200
+        )
     
     async def get_server_configuration(self):
         return {
