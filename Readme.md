@@ -146,9 +146,21 @@ RATE_WINDOW=60
 
 # Time in seconds before downloaded files are automatically deleted
 FILE_EXPIRE_TIME=300
+
+# CORS Configuration
+# Multiple origins can be specified using || as separator (e.g., "http://localhost:3000||https://example.com")
+# Use "*" to allow all origins (not recommended for production)
+ALLOWED_ORIGINS=*
+
+# Forwarded Origins Configuration for Uvicorn
+# Multiple origins can be specified using || as separator
+# Use "*" to allow all origins (not recommended for production)
+FORWARDED_ORIGINS=*
 ```
 - The application loads these variables using `python-dotenv`.
 - If `DEVELOPMENT` is `true`, API documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) will be available. These are disabled in production mode.
+- `ALLOWED_ORIGINS` controls which domains can access your API through CORS. For production, specify exact domains.
+- `FORWARDED_ORIGINS` controls which origins Uvicorn will trust for forwarded requests. Important for proper proxy handling.
 
 ### 4. (Required for youtube) Get `cookies.txt` for `Authenticated / pass robot check` Youtube Downloads
 

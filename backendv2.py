@@ -36,6 +36,8 @@ log = getLogger(__name__)
 PROJECT_ROOT = pathlib.Path(__file__).parent
 DOWNLOAD_FOLDER = pathlib.Path('downloads')
 DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split("||")
+UVICORN_FORWARDED_ORIGINS = os.environ.get("FORWARDED_ORIGINS", "*").split("||")
 
 if os.environ.get("FILE_EXPIRE_TIME") is not None and os.environ.get("FILE_EXPIRE_TIME").isdigit():
     FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
@@ -298,7 +300,7 @@ class BaseApplication(FastAPI):
 
         self.add_api_route("/server_config", self.get_server_configuration, methods=["GET"])
 
-        self.add_middleware(CORSMiddleware, allow_origins=["https://youtube-downloader-nine-drab.vercel.app", "http://localhost:5173"],
+        self.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
                         allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
         self.add_middleware(RateLimitMiddleware)
 
@@ -385,6 +387,8 @@ class BaseApplication(FastAPI):
                         message="Download completed (cached)",
                         filename=cached_file["filename"],
                         download_link=f"/files/{cached_file['session_id']}",
+                        expires_at=datetime.now(timezone.utc).timestamp() + FILE_EXPIRE_TIME,
+                        expires_in=FILE_EXPIRE_TIME,
                     )
 
         session_id = self.generate_uuid()
@@ -428,6 +432,8 @@ class BaseApplication(FastAPI):
                     message="Download completed",
                     filename=filename,
                     download_link=f"/files/{session_id}",
+                    expires_at=datetime.now(timezone.utc).timestamp() + FILE_EXPIRE_TIME,
+                    expires_in=FILE_EXPIRE_TIME,
                 )
             else:
                 if output.exists():
@@ -480,4 +486,4 @@ class BaseApplication(FastAPI):
 if __name__ == "__main__":
     import uvicorn
     log.info(f"YT-DLP VERSION: {yt_dlp.version.__version__}")
-    uvicorn.run(BaseApplication, host="0.0.0.0", port=8000, log_config=LOGGING_CONFIG)
+    uvicorn.run(BaseApplication, host="0.0.0.0", port=8000, log_config=LOGGING_CONFIG, forwarded_allow_ips=UVICORN_FORWARDED_ORIGINS)
