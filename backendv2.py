@@ -25,6 +25,7 @@ from manager.geo_utils.geoblock_checker import is_geo_restricted, get_video_id, 
 from request_class import DownloadRequest, FormatRequest, DataResponse, DownloadResponse
 from manager.database_utils.r2_storage import R2Storage
 from manager.database_utils.url_cache import URLCache
+from manager.LRU_cache.format_cache import FormatCache
 
 from manager.logging.logging_utils import LOGGING_CONFIG
 from logging import getLogger
@@ -94,6 +95,7 @@ class FileSession:
         self._task = None
         self.r2_storage = R2Storage()
         self.url_cache = URLCache()
+        self.format_cache = FormatCache(capacity=1000, expire_seconds=1800)  # 30 minutes expiration
 
     def add_session(self, session_id, file_path: pathlib.Path = None, url: str = None, format_option: str = None):
         """Add a new session with associated file path"""
@@ -394,7 +396,6 @@ class BaseApplication(FastAPI):
         return check
 
     async def get_all_formats(self, request: FormatRequest):
-
         url = request.url
         fetch_subtitle = request.fetch_subtitle or False
 
@@ -402,10 +403,25 @@ class BaseApplication(FastAPI):
             raise HTTPException(status_code=400, detail="URL is required")
 
         try:
+            # Check format cache first
+            cached_format = self.file_session.format_cache.get_cached_format(url)
+            if cached_format:
+                formats, file_name, subtitle_info = cached_format
+                return DataResponse(
+                    name=file_name,
+                    formats=formats,
+                    subtitle_info=subtitle_info
+                )
+
+            # If not in cache, fetch from yt-dlp
             formats, file_name, subtitle_info = await s2a(fetch_data)(url, max_audio=3, fetch_subtitle=fetch_subtitle)
             if not formats:
                 log.error(f"Fail to load formats for {url}")
                 raise HTTPException(status_code=404, detail="No formats found")
+            
+            # Cache the format information
+            self.file_session.format_cache.put_cached_format(url, formats, file_name, subtitle_info)
+            
             return DataResponse(
                 name=file_name,
                 formats=formats,
