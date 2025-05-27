@@ -1,11 +1,14 @@
-from typing import Any
-
+from typing import Optional
+import asyncio
 import yt_dlp
 from pydantic import BaseModel
 import pathlib
 from logging import getLogger
-from regex_manager import get_provider_from_url, is_youtube_playlist, resolve_url
-
+from manager.regex_manager.regex_manager import get_provider_from_url, is_youtube_playlist, resolve_url, normalize_facebook_url
+from manager.models.subtitle_model import SubtitleInfo
+import aiohttp
+import urllib.parse
+from os import environ
 log = getLogger(__name__)
 
 class FormatInfo(BaseModel):
@@ -29,6 +32,10 @@ def get_cookie_file(platform: str) -> str:
             return "./instagram_cookie.txt"
         case "facebook":
             return "./facebook_cookie.txt"
+        case "x":
+            return "./x_cookie.txt"
+        case "facebook_story":
+            return None # Story isn't fetch from yt-dlp, use api instead
         case _:
             return f"./{str(platform).lower().replace(' ', '_')}_cookie.txt"
 
@@ -58,18 +65,137 @@ default_formatData = [
     )
 ]
 
-def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
-    list[FormatInfo], Any
-]:
+def build_story_format(story_data: dict) -> list[FormatInfo]:
+    result: list[FormatInfo] = []
+    
+    for story in story_data["data"]["stories"]:
+        video_formats = sorted(
+            story["muted"],
+            key=lambda x: x.get("height", 0),
+            reverse=True
+        )
+        
+        audio_url = story.get("audio", "")
+        
+        for video in video_formats:
+            height = video.get("height", 0)
+            width = video.get("width", 0)
+            bandwidth = video.get("bandwidth", 0)
+            
+            bitrate_mbps = round(bandwidth / 1024 / 1024, 2)
+            
+            label = f"{height}p ({width}x{height}) {bitrate_mbps}Mbps + Audio"
+            
+            if audio_url:
+                result.append(
+                    FormatInfo(
+                        type="video+audio",
+                        format=f"fb-story-{height}p-merged",
+                        label=label,
+                        video_format=video["url"],
+                        audio_format=audio_url,
+                        note=f"Combined video and audio, Resolution: {width}x{height}"
+                    )
+                )
+        
+        # Add video-only formats
+        for video in video_formats:
+            height = video.get("height", 0)
+            width = video.get("width", 0)
+            bandwidth = video.get("bandwidth", 0)
+            bitrate_mbps = round(bandwidth / 1024 / 1024, 2)
+            
+            label = f"{height}p ({width}x{height}) {bitrate_mbps}Mbps [Video Only]"
+            
+            result.append(
+                FormatInfo(
+                    type="video-only",
+                    format=f"fb-story-{height}p",
+                    label=label,
+                    video_format=video["url"],
+                    audio_format="",
+                    note=f"Video only, Resolution: {width}x{height}"
+                )
+            )
+        if audio_url:
+            result.append(
+                FormatInfo(
+                    type="audio-only",
+                    format="fb-story-audio",
+                    label="Audio Track",
+                    video_format="none",
+                    audio_format=audio_url,
+                    note="Audio only track"
+                )
+            )
+    
+    return result
 
+if not environ.get("STORIE_API_URL"):
+    fb_story_api_supported = False
+else:
+    fb_story_api_supported = True
+
+async def fetch_story_data(fb_url: str, method: str = "html") -> dict:
+    try:
+        normalized_url = normalize_facebook_url(fb_url)
+
+        # Double encode the normalized URL
+        encoded_url = urllib.parse.quote(normalized_url, safe="")
+        encoded_url = urllib.parse.quote(encoded_url, safe="")
+
+        api_url = environ.get("STORIE_API_URL").format(encoded_url=encoded_url, method=method)
+
+        if not api_url:
+            raise ValueError("STORIE_API_URL is not set")
+
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url, headers=headers) as response:
+                if response.status == 200:
+                    print("✅ Success")
+                    return await response.json()
+                else:
+                    print(f"❌ HTTP {response.status}")
+                    print(await response.text())
+                    return {}
+    except Exception as e:
+        print("❌ Error:", str(e))
+        return {}
+
+def fetch_data(url: str, max_audio: int = 3, fetch_subtitle: bool = True) -> tuple[
+    list[FormatInfo], str | None, Optional[SubtitleInfo]
+]:
+    """
+    Fetch format data and subtitle information from a URL
+    
+    Args:
+        url: The URL to fetch from
+        max_audio: Maximum number of audio formats to return
+        fetch_subtitle: Whether to fetch subtitle information
+        
+    Returns:
+        Tuple of (format_list, filename, subtitle_info)
+    """
     opt = {
         "quiet": True,
         "no_warnings": True,
         "logger": log,
         "ignoreerrors": True,
+        "writesubtitles": fetch_subtitle,
+        "allsubtitles": fetch_subtitle,
     }
 
     platform = get_provider_from_url(url)
+
+    if platform == "facebook_story" and fb_story_api_supported:
+        url = normalize_facebook_url(url)
+        story_data = asyncio.run(fetch_story_data(url))
+        return build_story_format(story_data), url, None
+
     if platform:
         cookiefile = get_cookie_file(platform)
         opt["cookiefile"] = cookiefile
@@ -84,13 +210,24 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
             info = ydl.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as e:
             print(f"Error extracting info: {e}")
-            return [], None
+            return [], None, None
 
         filename = ydl.prepare_filename(info)
         raw_formats = info.get("formats", [])
+        subtitle_info = None
+        
+        if fetch_subtitle:
+            subtitles = info.get("subtitles", {})
+            
+            if subtitles:
+                all_subtitles = {**subtitles}
+                subtitle_info = SubtitleInfo.from_yt_dlp_data(all_subtitles)
+                
+        
         if not raw_formats:
             print("No formats found in extracted info.")
-            return [], filename
+            return [], filename, subtitle_info
+        
         
         log.debug(f"Starting to process formats for {platform} platform")
         
@@ -110,7 +247,6 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
                 video_codec = f.get("vcodec", "unknown")
                 resolution_key = f"{video_height}p_{video_codec}"
 
-                # Skip duplicate resolutions with same codec
                 if resolution_key in seen_resolutions:
                     continue
                 
@@ -133,7 +269,7 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
             if len(result) < 1:
                 result = default_formatData
 
-            return result, filename
+            return result, filename, subtitle_info if fetch_subtitle else None
 
         video_formats = [
             f for f in raw_formats
@@ -164,7 +300,7 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
                 if audio_bitrate_kbps <= 66.7 and platform == "youtube":
                     continue
 
-                label = f"{video_height}p ({video_ext}) [Audio: {audio_bitrate_kbps}Kbps] {'[PREMIUM]' if str(v.get('format_note')).lower() == 'premium' else ''}".strip()
+                label = f"{video_height}p ({video_ext}) [Audio: {audio_bitrate_kbps}Kbps]".strip()
 
                 result.append(
                     FormatInfo(
@@ -206,14 +342,22 @@ def fetch_format_data(url: str, max_audio: int = 3) -> tuple[
         if len(result) < 1:
             result = default_formatData
 
-        return result, filename
+        return result, filename, subtitle_info
 
 
-def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
+def run_yt_dlp_download(url: str, format_option: str, subtitle: str, output: pathlib.Path):
     """
     Runs yt-dlp in a subprocess.
     This function is designed to be run in a background task or awaited.
-    Returns a dictionary with results or raises an exception.
+    
+    Args:
+        url: URL to download from
+        format_option: Format ID for video/audio
+        subtitle: Subtitle language code (e.g., 'en', 'ja', or None)
+        output: Output directory path
+        
+    Returns:
+        Dictionary with download results
     """
     ydl_opts = {
         'format': format_option,
@@ -231,6 +375,20 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
         'extract_flat': False,
         'logger': log,
     }
+
+    if subtitle is not None:
+        ydl_opts.update({
+            'writesubtitles': True,
+            'writeautomaticsub': True,  
+            'subtitleslangs': [subtitle],
+            'subtitlesformat': 'best', 
+            'embedsubtitles': True,     
+            'postprocessors': [{
+                'key': 'FFmpegEmbedSubtitle',
+                'already_have_subtitle': False 
+            }]
+        })
+
     platform = get_provider_from_url(url)
     if platform:
         cookie_file = get_cookie_file(platform)
@@ -242,6 +400,9 @@ def run_yt_dlp_download(url: str, format_option: str, output: pathlib.Path):
     # Refuse to download playlists, resolve to the first video in the playlist
     if platform == "youtube" and is_youtube_playlist(url):
         url = resolve_url(url)
+
+    if platform == "facebook_story" and fb_story_api_supported:
+        ... # Comming soon™
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
