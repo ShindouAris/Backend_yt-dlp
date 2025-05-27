@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from ytdl_tools import FormatInfo
-
+from manager.ytdlp_tool.ytdl_tools import FormatInfo
+from manager.models.subtitle_model import SubtitleInfo
 
 class DownloadResponse(BaseModel):
     message: str
@@ -15,10 +15,13 @@ class DownloadResponse(BaseModel):
 class DownloadRequest(BaseModel):
     url: str
     format: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"
+    subtitle: str | None = None
 
 class FormatRequest(BaseModel):
     url: str
+    fetch_subtitle: bool = False
 
-class FormatResponse(BaseModel):
+class DataResponse(BaseModel):
     name: str
     formats: list[FormatInfo]
+    subtitle_info: SubtitleInfo | None = None

@@ -20,13 +20,13 @@ import yt_dlp
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ytdl_tools import fetch_format_data, run_yt_dlp_download
-from geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
-from request_class import DownloadRequest, FormatRequest, FormatResponse, DownloadResponse
-from r2_storage import R2Storage
-from url_cache import URLCache
+from manager.ytdlp_tool.ytdl_tools import fetch_data, run_yt_dlp_download
+from manager.geo_utils.geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
+from request_class import DownloadRequest, FormatRequest, DataResponse, DownloadResponse
+from manager.database_utils.r2_storage import R2Storage
+from manager.database_utils.url_cache import URLCache
 
-from logging_utils import LOGGING_CONFIG
+from manager.logging.logging_utils import LOGGING_CONFIG
 from logging import getLogger
 
 import random
@@ -287,7 +287,7 @@ class BaseApplication(FastAPI):
                         redoc_url="/redoc" if IS_DEVELOPMENT else None,
                         openapi_url="/openapi.json" if IS_DEVELOPMENT else None)
 
-        self.add_api_route("/get_all_format", self.get_all_formats, response_model=FormatResponse, methods=["POST"],
+        self.add_api_route("/get_all_format", self.get_all_formats, response_model=DataResponse, methods=["POST"],
                             dependencies=[Depends(verify_token)])
 
         self.add_api_route("/download", self.download_video, methods=["POST"]
@@ -393,30 +393,32 @@ class BaseApplication(FastAPI):
 
         return check
 
-
     async def get_all_formats(self, request: FormatRequest):
 
         url = request.url
+        fetch_subtitle = request.fetch_subtitle or False
 
         if not url.strip():
             raise HTTPException(status_code=400, detail="URL is required")
 
         try:
-            formats, file_name = await s2a(fetch_format_data)(url, max_audio=3)
+            formats, file_name, subtitle_info = await s2a(fetch_data)(url, max_audio=3, fetch_subtitle=fetch_subtitle)
             if not formats:
                 log.error(f"Fail to load formats for {url}")
                 raise HTTPException(status_code=404, detail="No formats found")
-            return FormatResponse(
+            return DataResponse(
                 name=file_name,
-                formats=formats
+                formats=formats,
+                subtitle_info=subtitle_info
             )
         except Exception as e:
-            log.error("An error occurred while fetching formats:", str(e))
-            raise HTTPException(status_code=500, detail=f"Error fetching formats: {str(e)}")
+            log.error("An error occurred while fetching data:", str(e))
+            raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
     async def download_video(self, request_data: DownloadRequest):
         url = request_data.url
         format_option = request_data.format
+        subtitle = request_data.subtitle or None
 
         if not url:
             raise HTTPException(status_code=400, detail="URL is required")
@@ -443,7 +445,7 @@ class BaseApplication(FastAPI):
         output.mkdir(parents=True, exist_ok=True)
 
         try:
-            result = await s2a(run_yt_dlp_download)(url, format_option, output)
+            result = await s2a(run_yt_dlp_download)(url, format_option, subtitle, output)
 
             if result["success"]:
                 filename = resolve_file_name_from_folder(str(output))

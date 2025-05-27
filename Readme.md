@@ -34,6 +34,10 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 
 - **Fetch Video Formats**: Get a list of available video and audio formats for a given URL.
 - **Download Videos**: Download videos using `yt-dlp` with user-selected formats (protected by Bearer token).
+- **Subtitle Support**: 
+  - Fetch available subtitle tracks in multiple languages
+  - Embed subtitles directly into video files
+  - Support for both manual and auto-generated captions
 - **Geo-restriction Check**: Check if a YouTube video is geo-restricted (protected by Bearer token, requires Google API Key).
 - **Session Management**: Each download is associated with a unique session ID.
 - **Automatic File Cleanup**: Downloaded files are automatically deleted after a configurable timeout (default: 30 minutes).
@@ -308,69 +312,73 @@ Provides a welcome message, lists available routes, and shows server uptime.
 
 ### 2. **POST** `/get_all_format` [`Protected`]
 
-Fetches available download formats for a given video URL. Requires Bearer token authentication.
+Fetches available download formats and subtitle information for a given video URL. Requires Bearer token authentication.
 
 - **Request Body** (JSON, `FormatRequest`):
   ```json
   {
-    "url": "https://www.youtube.com/watch?v=example"
+    "url": "https://www.youtube.com/watch?v=example",
+    "fetch_subtitle": true  // Optional, defaults to false
   }
   ```
-- **Response** (JSON, `FormatResponse`):
+- **Response** (JSON, `DataResponse`):
   ```json
   {
     "name": "Video Title [video_id].ext",
     "formats": [
       {
-        "type": "video+audio", // e.g., "video+audio", "audio-only", "video-only"
-        "format": "313+251",    // yt-dlp format_id string, used for download
-        "label": "2160p (webm) [Audio: 134.2Kbps]", // Human-readable description
-        "video_format": "313", // Video part format_id (if applicable)
-        "audio_format": "251", // Audio part format_id (if applicable)
-        "note": "2160p"        // Additional note from yt-dlp (e.g., resolution, "medium", "low")
-      },
-      // ... more FormatInfo objects
-      {
-        "type": "audio-only",
-        "format": "251",
-        "label": "Audio only: 134.2kbps (webm)",
-        "video_format": null,
+        "type": "video+audio",
+        "format": "313+251",
+        "label": "2160p (webm) [Audio: 134.2Kbps]",
+        "video_format": "313",
         "audio_format": "251",
         "note": "2160p"
       }
       // ... more FormatInfo objects
-    ]
+    ],
+    "subtitle_info": {  // Present only if fetch_subtitle is true
+      "tracks": {
+        "en": {
+          "formats": [
+            {
+              "ext": "vtt",
+              "url": "https://example.com/subtitles.vtt",
+              "name": "English"
+            }
+          ],
+          "language_code": "en",
+          "language_name": "English"
+        }
+        // ... more language tracks
+      },
+      "automatic_captions": true,
+      "manual_captions": false
+    }
   }
   ```
-- **Error Responses**:
-    - `403 Forbidden`: Invalid or missing token.
-    - `500 Internal Server Error`: If download fails (e.g., `yt_dlp.utils.DownloadError`).
 
 ### 3. **POST** `/download` `[Protected]`
 
-Initiates a video download for the specified URL and format. Requires Bearer token authentication.
+Initiates a video download with optional subtitle embedding. Requires Bearer token authentication.
 
 - **Request Body** (JSON, `DownloadRequest`):
   ```json
   {
     "url": "https://www.youtube.com/watch?v=example",
-    "format": "313+251" // Defaults to "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" if not provided
+    "format": "313+251",  // Defaults to "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" if not provided
+    "subtitle": "en"      // Optional: Language code for subtitle embedding (e.g., "en", "ja", "ko")
   }
   ```
 - **Successful Response** (JSON, `DownloadResponse`):
   ```json
   {
     "message": "Download completed",
-    "filename": "actual_downloaded_filename.ext", // Actual filename saved on the server in the session folder
+    "filename": "actual_downloaded_filename.ext",
     "download_link": "/files/<session_id>",
-    "details": null, // Optional
-    "yt_dlp_output": null // Optional
+    "expires_at": 1234567890.123,
+    "expires_in": 300
   }
   ```
-  *(`<session_id>` will be a UUID4 string. The `filename` is the actual name of the file saved in the session folder on the server.)*
-- **Error Responses**:
-    - `403 Forbidden`: Invalid or missing token.
-    - `500 Internal Server Error`: If download fails (e.g., `yt_dlp.utils.DownloadError`).
 
 ### 4. **GET** `/files/<session_id>`
 
@@ -774,6 +782,13 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
     - Yes, set `USE_R2_STORAGE=false` in `.env`
     - Files will be stored locally with automatic cleanup
     - All functionality remains the same, just using local storage
+
+13. **How does subtitle embedding work?**
+    - Use `fetch_subtitle: true` in `/get_all_format` to see available subtitle tracks
+    - Specify `subtitle` parameter in `/download` request with desired language code
+    - Subtitles are embedded directly into the video file
+    - Embedded subtitles can be toggled on/off in video players
+    - Supports both manual and auto-generated captions
 
 ---
 ## License
