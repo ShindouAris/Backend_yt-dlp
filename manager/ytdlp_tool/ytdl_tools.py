@@ -300,7 +300,7 @@ def fetch_data(url: str, max_audio: int = 3, fetch_subtitle: bool = True) -> tup
                 if audio_bitrate_kbps <= 66.7 and platform == "youtube":
                     continue
 
-                label = f"{video_height}p ({video_ext}) [Audio: {audio_bitrate_kbps}Kbps] {'[PREMIUM]' if str(v.get('format_note')).lower() == 'premium' else ''}".strip()
+                label = f"{video_height}p ({video_ext}) [Audio: {audio_bitrate_kbps}Kbps]".strip()
 
                 result.append(
                     FormatInfo(
