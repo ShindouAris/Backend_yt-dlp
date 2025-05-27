@@ -57,12 +57,6 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 # Project structure
 ```
 Backend_yt-dlp/
-├── .git/
-├── .idea/
-├── .logs/
-│   └── Running.log
-├── .venv/
-├── __pycache__/
 ├── assets/
 │   ├── render_deploy_clone_repo.png
 │   ├── render_deploy_config.png
@@ -73,25 +67,19 @@ Backend_yt-dlp/
 │   │   ├── LRU_NODE.py
 │   │   └── format_cache.py
 │   ├── database_utils/
-│   │   ├── __pycache__/
 │   │   ├── r2_storage.py
 │   │   └── url_cache.py
 │   ├── ffmpeg/
 │   │   └── ffmpeg_tools.py
 │   ├── geo_utils/
-│   │   ├── __pycache__/
 │   │   └── geoblock_checker.py
 │   ├── logging/
-│   │   ├── __pycache__/
 │   │   └── logging_utils.py
 │   ├── models/
-│   │   ├── __pycache__/
 │   │   └── subtitle_model.py
 │   ├── regex_manager/
-│   │   ├── __pycache__/
 │   │   └── regex_manager.py
 │   └── ytdlp_tool/
-│       ├── __pycache__/
 │       └── ytdl_tools.py
 ├── payloads/
 │   ├── facebook_get_format_payload.json
@@ -100,21 +88,14 @@ Backend_yt-dlp/
 │   └── youtube_get_data_payload.jsonc
 ├── template/
 │   └── gomen.html
-├── .env
 ├── .gitignore
 ├── LICENSE
-├── ProjectDump_v1.0.1.exe
 ├── Readme.md
 ├── backendv2.py
 ├── cookie.example.txt
-├── cookie.txt
 ├── example.env
-├── facebook_cookie.txt
-├── instagram_cookie.txt
 ├── request_class.py
-├── requirements.txt
-├── story_data.json
-└── yt_dlp_cookie.txt // Ignored by git
+└── requirements.txt
 ```
 
 ---
