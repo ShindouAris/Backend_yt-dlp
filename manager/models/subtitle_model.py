@@ -78,11 +78,14 @@ class SubtitleInfo(BaseModel):
                 manual = True
 
         #  `all` is a special language code that represents all available subtitles
-        tracks["all"] = SubtitleTrack(
-            formats=subtitle_formats,
-            language_code="all",
-            language_name="All"
-        )
+        # DANGEROUS: If live-chat is included, it will fuck up the backend -> Ratelimited -> Blocked
+        # TODO: Find a better way to handle this
+
+        # tracks["all"] = SubtitleTrack(
+        #     formats=subtitle_formats,
+        #     language_code="all",
+        #     language_name="All"
+        # )
 
         return cls(
             tracks=tracks,
