@@ -8,7 +8,8 @@ from manager.regex_manager.regex_manager import get_provider_from_url, is_youtub
 from manager.models.subtitle_model import SubtitleInfo
 import aiohttp
 import urllib.parse
-from os import environ
+from os import environ, path
+import tqdm
 log = getLogger(__name__)
 
 class FormatInfo(BaseModel):
@@ -344,6 +345,39 @@ def fetch_data(url: str, max_audio: int = 3, fetch_subtitle: bool = True) -> tup
 
         return result, filename, subtitle_info
 
+download_hooks = {}
+
+def hook_download(d):
+    try:
+        filename = d.get('filename', 'unknown')
+        status = d.get('status')
+        total = d.get('total_bytes', 0)
+        downloaded = d.get('downloaded_bytes', 0)
+        if status == 'downloading':
+            if filename not in download_hooks:
+                download_hooks[filename] = tqdm.tqdm(
+                    total=total,
+                    unit='B',
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc=f"Downloading {path.basename(filename)}",
+                    bar_format="{desc}: [{bar:30}] {percentage:3.0f}% ({n_fmt}/{total_fmt}) [⏱ {elapsed} < {remaining}]",
+                    ascii=" >=",
+                    colour="GREEN"
+                )
+
+                bar = download_hooks[filename]
+                bar.n = downloaded
+                bar.refresh()
+        elif status == 'finished':
+            if filename in download_hooks:
+                bar = download_hooks[filename]
+                bar.n = total
+                bar.refresh()
+                bar.close()
+                del download_hooks[filename]
+    except Exception as e:
+        log.error(f"Error in hook_download: {e}")
 
 def run_yt_dlp_download(url: str, format_option: str, subtitle: str, output: pathlib.Path):
     """
@@ -366,7 +400,6 @@ def run_yt_dlp_download(url: str, format_option: str, subtitle: str, output: pat
         },
         'keepvideo': False,
         'noplaylist': False,
-        'noprogress': True,
         'ignoreerrors': True,
         'quiet': True,
         'verbose': False,
@@ -374,6 +407,7 @@ def run_yt_dlp_download(url: str, format_option: str, subtitle: str, output: pat
         'simulate': False,
         'extract_flat': False,
         'logger': log,
+        'progress_hooks': [hook_download],
     }
 
     if subtitle is not None:
