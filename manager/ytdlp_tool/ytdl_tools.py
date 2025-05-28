@@ -415,4 +415,17 @@ def run_yt_dlp_download(url: str, format_option: str, subtitle: str, output: pat
             return {
                 "success": False,
             }
+        except yt_dlp.utils.ExtractorError:
+            return {
+                "success": False,
+            }
+        except yt_dlp.utils.UnavailableVideoError:
+            return {
+                "success": False,
+            }
+        except Exception as e:
+            log.error(f"Error downloading {url}: {e}")
+            return {
+                "success": False
+            }
 
