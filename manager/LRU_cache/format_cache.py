@@ -4,7 +4,9 @@ from manager.models.subtitle_model import SubtitleInfo
 from typing import Optional, Tuple, List
 import re
 from urllib.parse import urlparse, parse_qs
+from logging import getLogger
 
+log = getLogger(__name__)
 
 def normalize_youtube_url(url: str) -> str:
     """
@@ -54,8 +56,11 @@ class FormatCache(LRUCache):
             cached_data = self.get(normalized_url)
             if cached_data:
                 return cached_data
+        except KeyError:
+            # Miss cache, return nothing 
+            return None
         except Exception as e:
-            print(f"Error getting cached format for {url}: {e}")
+            log.error(f"Error getting cached format for {url}: {e}")
             return None
 
     def put_cached_format(self, url: str, format_data: List[FormatInfo], filename: str, subtitle_info: Optional[SubtitleInfo]) -> None:
@@ -72,7 +77,7 @@ class FormatCache(LRUCache):
             normalized_url = normalize_youtube_url(url)
             self.put(normalized_url, (format_data, filename, subtitle_info))
         except Exception as e:
-            print(f"Error putting cached format for {url}: {e}")
+            log.error(f"Error putting cached format for {url}: {e}")
 
     def delete_cached_format(self, url: str) -> None:
         """
@@ -85,6 +90,6 @@ class FormatCache(LRUCache):
             normalized_url = normalize_youtube_url(url)
             self.delete(normalized_url)
         except Exception as e:
-            print(f"Error deleting cached format for {url}: {e}")
+            log.error(f"Error deleting cached format for {url}: {e}")
 
 
