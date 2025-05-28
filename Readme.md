@@ -14,7 +14,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     * [Get `cookies.txt`](#4-optional-get-cookiestxt-for-authenticated--pass-robot-check-youtube-downloads)
 * [📡 API Endpoints](#api-endpoints)
     * [`/`](#1-get--head-)
-    * [`/fetch_data`](#2-post-get_all_format-protected)
+    * [`/fetch_data`](#2-post-fetch_data-protected)
     * [`/download`](#3-post-download-protected)
     * [`/files/<session_id>`](#4-get-filessession_id)
     * [`/geo_check`](#5-post-geo_check-protected)
