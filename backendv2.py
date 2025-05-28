@@ -359,7 +359,7 @@ class BaseApplication(FastAPI):
             self.file_session.start()
             yield None
         finally:
-            self.file_session.clear_sessions()
+            await self.file_session.clear_sessions()
 
     @staticmethod
     def generate_uuid():
