@@ -18,7 +18,6 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     * [`/download`](#3-post-download-protected)
     * [`/files/<session_id>`](#4-get-filessession_id)
     * [`/geo_check`](#5-post-geo_check-protected)
-    * [`/server_config`](#6-get-server_config)
 * [☁️ Storage Configuration](#storage-configuration)
     * [R2 Storage](#r2-storage)
     * [URL Caching](#url-caching)
@@ -533,24 +532,6 @@ Checks if a YouTube video is geo-restricted. Requires Bearer token authenticatio
 - **Error Responses**:
     - `401 Unauthorized`: If `YOUTUBE_V3_APIKEY` is not configured on the server.
     - `403 Forbidden`: Invalid or missing token.
-
-### 6. **GET** `/server_config`
-
-Returns the current server configuration settings.
-
-- **Response** (JSON):
-  ```json
-  {
-    "FILE_EXPIRE_TIME": 300,    // Time in seconds before downloaded files are deleted
-    "RATE_LIMIT": 150,         // Maximum requests allowed per IP within RATE_WINDOW
-    "RATE_WINDOW": 60          // Time window in seconds for rate limiting
-  }
-  ```
-
-- **Example Usage**:
-  ```bash
-  curl http://127.0.0.1:8000/server_config
-  ```
 
 ---
 
