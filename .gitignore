@@ -6,7 +6,4 @@ downloads
 cookie.txt
 .logs
 .env
-yt_dlp_cookie.txt
-tiktok_cookie.txt
-instagram_cookie.txt
-facebook_cookie.txt
+*_cookie.txt
