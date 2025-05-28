@@ -14,7 +14,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
     * [Get `cookies.txt`](#4-optional-get-cookiestxt-for-authenticated--pass-robot-check-youtube-downloads)
 * [📡 API Endpoints](#api-endpoints)
     * [`/`](#1-get--head-)
-    * [`/get_all_format`](#2-post-get_all_format)
+    * [`/fetch_data`](#2-post-get_all_format-protected)
     * [`/download`](#3-post-download-protected)
     * [`/files/<session_id>`](#4-get-filessession_id)
     * [`/geo_check`](#5-post-geo_check-protected)
@@ -166,6 +166,9 @@ RATE_WINDOW=60
 
 # Time in seconds before downloaded files are automatically deleted
 FILE_EXPIRE_TIME=300
+
+# DISABLE AUTOMATIC FILE DELETION
+KEEP_LOCAL_FILES=false
 
 # CORS Configuration
 # Multiple origins can be specified using || as separator (e.g., "http://localhost:3000||https://example.com")
@@ -326,7 +329,7 @@ Provides a welcome message, lists available routes, and shows server uptime.
   }
   ```
 
-### 2. **POST** `/get_all_format` [`Protected`]
+### 2. **POST** `/fetch_data` [`Protected`]
 
 Fetches available download formats and subtitle information for a given video URL. Requires Bearer token authentication.
 
@@ -766,45 +769,54 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
      - Use `/get_all_format` to confirm whether audio-only or combined formats are available.
      - Some videos may be uploaded without an audio track (e.g., raw footage, livestreams).
 
+10. **Download folder is filling up with old files**
+    * Ensure you doesn't have `KEEP_LOCAL_FILES=true` in your `.env` file unless you want to keep all downloaded files.
 
 ---
 
 ## FAQ
 
-1.  **How do I change the download format?**
+1. **How do I change the download format?**
     -   Call `/get_all_format` to list formats. Use the `format` string (e.g., `"137+140"`) from that response in the `/download` request body. Defaults to `"bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"` if `format` is omitted.
 
-2.  **Can I download playlists?**
+2. **Can I download playlists?**
     -   No, this API is for single video downloads (~~Planning for multiple download later~~).
 
-3.  **How are large files handled? Are there size limits?**
+3. **How are large files handled? Are there size limits?**
     -   Files are temporarily stored on the server. Limits depend on server disk space (ephemeral on Render's free tier). Auto-deleted after 5 minutes (default). For longer storage/larger files, modify `FILE_EXPIRE_TIME` in `ENVIRONMENT` or `.env`.
 
-4.  **How do I get the `cookies.txt` file?**
+4. **How do I get the `cookies.txt` file?**
     -   Refer to "Local Setup" section: "4. (Optional) Get `cookies.txt`...". Key steps: use Cookie-Editor, private/incognito window, export Netscape format, save as `cookies.txt` with correct first line.
 
-10. **How does R2 storage work with the API?**
-    - When enabled, files are stored in Cloudflare R2 instead of locally
-    - Files are served via presigned URLs with 30-minute validity
-    - Local storage is used as fallback only if R2 upload fails
-    - Configure R2 credentials in `.env` file
+5. **How does R2 storage work with the API?**
+   - When enabled, files are stored in Cloudflare R2 instead of locally
+   - Files are served via presigned URLs with 30-minute validity
+   - Local storage is used as fallback only if R2 upload fails
+   - Configure R2 credentials in `.env` file
 
-11. **What's the difference between Redis and in-memory caching?**
-    - Redis cache persists across server restarts and works with multiple instances
-    - In-memory cache is faster but limited to single instance and cleared on restart
-    - Redis recommended for production, in-memory suitable for development
+6. **What's the difference between Redis and in-memory caching?**
+   - Redis cache persists across server restarts and works with multiple instances
+   - In-memory cache is faster but limited to single instance and cleared on restart
+   - Redis recommended for production, in-memory suitable for development
 
-12. **Can I use the API without R2 storage?**
-    - Yes, set `USE_R2_STORAGE=false` in `.env`
-    - Files will be stored locally with automatic cleanup
-    - All functionality remains the same, just using local storage
+7. **Can I use the API without R2 storage?**
+   - Yes, set `USE_R2_STORAGE=false` in `.env`
+   - Files will be stored locally with automatic cleanup
+   - All functionality remains the same, just using local storage
 
-13. **How does subtitle embedding work?**
-    - Use `fetch_subtitle: true` in `/get_all_format` to see available subtitle tracks
-    - Specify `subtitle` parameter in `/download` request with desired language code
-    - Subtitles are embedded directly into the video file
-    - Embedded subtitles can be toggled on/off in video players
-    - Supports both manual and auto-generated captions
+8. **How does subtitle embedding work?**
+   - Use `fetch_subtitle: true` in `/get_all_format` to see available subtitle tracks
+   - Specify `subtitle` parameter in `/download` request with desired language code
+   - Subtitles are embedded directly into the video file
+   - Embedded subtitles can be toggled on/off in video players
+   - Supports both manual and auto-generated captions
+
+9. **I want to keep downloaded files, How do I disable auto-deletion?**
+   - Set `KEEP_LOCAL_FILES=true` in your `.env` file
+   - This prevents automatic deletion of downloaded files after the expiration time
+   - Useful for long-term storage or manual review of downloaded content
+   - Note: This may not work when using R2 storage, as files are uploaded and not stored locally
+   - Note: This will increase disk usage, so ensure sufficient storage is available
 
 ---
 ## License

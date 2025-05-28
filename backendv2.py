@@ -42,6 +42,7 @@ DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split("||")
 UVICORN_FORWARDED_ORIGINS = os.environ.get("FORWARDED_ORIGINS", "*").split("||")
 ENABLE_TROLLING_ROUTE = os.environ.get("ENABLE_TROLLING_ROUTE", "False").lower() == "true"
+DISABLE_AUTO_CLEANUP = os.environ.get("KEEP_LOCAL_FILES", "False").lower() == "true"
 
 if os.environ.get("FILE_EXPIRE_TIME") is not None and os.environ.get("FILE_EXPIRE_TIME").isdigit():
     FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
@@ -176,6 +177,9 @@ class FileSession:
                         if not self.r2_storage.enabled:
                             # For local storage, file_path is the full path to the session directory
                             full_path = file_path if isinstance(file_path, pathlib.Path) else DOWNLOAD_FOLDER / session_id
+                            if DISABLE_AUTO_CLEANUP:
+                                log.debug("Skipping cleanup for local session: %s", session_id)
+                                continue
                             if full_path.exists():
                                 log.debug("Cleaning up local session: %s", session_id)
                                 rmtree(full_path)
@@ -229,22 +233,21 @@ class FileSession:
                 
                 if file_path:
                     try:
-                        # Handle local storage cleanup
                         if not self.r2_storage.enabled:
-                            # For local storage, file_path[0] is the full path to the session directory
+                            if DISABLE_AUTO_CLEANUP:
+                                log.debug("Skipping cleanup for local session: %s", session_id)
+                                continue
                             full_path = file_path[0] if isinstance(file_path[0], pathlib.Path) else DOWNLOAD_FOLDER / session_id
                             if full_path.exists():
                                 log.debug("Cleaning up local session: %s", session_id)
                                 rmtree(full_path)
-                        
-                        # Handle R2 storage cleanup
+
                         elif self.r2_storage.enabled:
                             # For R2 storage, file_path[0] is just the filename
                             filename = file_path[0].name if isinstance(file_path[0], pathlib.Path) else file_path[0]
                             object_name = f"{session_id}/{filename}"
                             await s2a(self.r2_storage.delete_file)(object_name)
-                        
-                        # Always clean up cache
+
                         if self.url_cache.enabled:
                             self.url_cache.remove_all_by_session(session_id)
                         
@@ -260,8 +263,7 @@ class FileSession:
                 log.error(f"Error during session cleanup: {e}")
 
         log.info("Emergency cleanup completed: %d sessions cleaned, %d errors", cleaned, errors)
-        
-        # Final safety check - clean up downloads directory if it exists
+
         try:
             if DOWNLOAD_FOLDER.exists():
                 for session_dir in DOWNLOAD_FOLDER.iterdir():
@@ -320,7 +322,7 @@ class BaseApplication(FastAPI):
                         redoc_url="/redoc" if IS_DEVELOPMENT else None,
                         openapi_url="/openapi.json" if IS_DEVELOPMENT else None)
 
-        self.add_api_route("/get_all_format", self.get_all_formats, response_model=DataResponse, methods=["POST"],
+        self.add_api_route("/fetch_data", self.get_all_formats, response_model=DataResponse, methods=["POST"],
                             dependencies=[Depends(verify_token)])
 
         self.add_api_route("/download", self.download_video, methods=["POST"]
@@ -333,8 +335,6 @@ class BaseApplication(FastAPI):
                             dependencies=[Depends(verify_token)])
 
         self.add_api_route("/", self.root, methods=["GET", "HEAD"])
-
-        self.add_api_route("/server_config", self.get_server_configuration, methods=["GET"])
 
         if ENABLE_TROLLING_ROUTE:
             self.add_api_route("/.env", self.fake_environment, methods=["GET"])
@@ -402,13 +402,6 @@ class BaseApplication(FastAPI):
             content=random.choice(messages),
             status_code=200
         )
-    
-    async def get_server_configuration(self):
-        return {
-            "FILE_EXPIRE_TIME": FILE_EXPIRE_TIME,
-            "RATE_LIMIT": RATE_LIMIT,
-            "RATE_WINDOW": RATE_WINDOW
-        }
 
     async def check_geo_block(self, request: FormatRequest):
 
@@ -544,6 +537,13 @@ class BaseApplication(FastAPI):
             return Response(
                 content="Download failed",
                 status_code=500,
+            )
+        except FileNotFoundError:
+            if output.exists():
+                rmtree(output)
+            return Response(
+                content="Download Failed",
+                status_code=500
             )
 
     async def get_downloaded_file(self, session_id: str):
