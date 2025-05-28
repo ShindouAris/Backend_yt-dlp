@@ -10,7 +10,7 @@ import uuid
 import os
 import pathlib
 from asgiref.sync import sync_to_async as s2a
-from asyncio import sleep, create_task
+from asyncio import sleep, create_task, TimeoutError as AsyncTimeoutError
 from shutil import rmtree
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -96,45 +96,67 @@ class FileSession:
         self.r2_storage = R2Storage()
         self.url_cache = URLCache()
         self.format_cache = FormatCache(capacity=1000, expire_seconds=1800)  # 30 minutes expiration
+        self._upload_tasks: dict[str, create_task] = {}  # Track upload tasks
+
+    async def _upload_to_r2(self, session_id: str, file_path: pathlib.Path, url: str, format_option: str) -> None:
+        """
+        Asynchronously upload a file to R2 storage with timeout handling.
+        """
+        try:
+            first_file = resolve_file_name_from_folder(str(file_path))
+            full_file_path = file_path / first_file
+            object_name = f"{session_id}/{first_file}"
+
+            # Attempt upload with timeout
+            upload_success = await s2a(self.r2_storage.upload_file)(str(full_file_path), object_name)
+            
+            if upload_success:
+                # Cache the file information
+                self.url_cache.cache_file(
+                    url,
+                    format_option,
+                    {
+                        "session_id": session_id,
+                        "object_name": object_name,
+                        "filename": first_file
+                    },
+                    FILE_EXPIRE_TIME
+                )
+                # Delete local file after successful upload
+                rmtree(file_path)
+                # Store only the filename for reference
+                self.storage[session_id] = (pathlib.Path(first_file), datetime.now(timezone.utc).timestamp())
+            else:
+                # If R2 upload fails, keep local file as fallback
+                self.storage[session_id] = (file_path, datetime.now(timezone.utc).timestamp())
+                log.warning(f"R2 upload failed for session {session_id}, keeping local file")
+
+        except (AsyncTimeoutError, Exception) as e:
+            log.error(f"Error during R2 upload for session {session_id}: {e}")
+            # Keep local file as fallback
+            self.storage[session_id] = (file_path, datetime.now(timezone.utc).timestamp())
+        finally:
+            # Clean up the task reference
+            if session_id in self._upload_tasks:
+                del self._upload_tasks[session_id]
 
     def add_session(self, session_id, file_path: pathlib.Path = None, url: str = None, format_option: str = None):
         """Add a new session with associated file path"""
         self.sessions.append(session_id)
         if file_path:
-            created_time = datetime.now(timezone.utc).timestamp()
-            
-            # If R2 storage is enabled, upload the file and then delete local copy
             if self.r2_storage.enabled and url and format_option:
-                first_file = resolve_file_name_from_folder(str(file_path))
-                full_file_path = file_path / first_file
-                object_name = f"{session_id}/{first_file}"
-                
-                if self.r2_storage.upload_file(str(full_file_path), object_name):
-                    # Cache the file information
-                    self.url_cache.cache_file(
-                        url,
-                        format_option,
-                        {
-                            "session_id": session_id,
-                            "object_name": object_name,
-                            "filename": first_file
-                        },
-                        FILE_EXPIRE_TIME
-                    )
-                    # Delete local file after successful upload
-                    rmtree(file_path)
-                    # Store only the filename for reference
-                    self.storage[session_id] = (pathlib.Path(first_file), created_time)
-                else:
-                    # If R2 upload fails, keep local file as fallback
-                    self.storage[session_id] = (file_path, created_time)
+                # Create async task for R2 upload
+                upload_task = create_task(self._upload_to_r2(session_id, file_path, url, format_option))
+                self._upload_tasks[session_id] = upload_task
+                # Initially store the local path until upload completes
+                self.storage[session_id] = (file_path, datetime.now(timezone.utc).timestamp())
             else:
                 # If R2 is not enabled, store locally with full path
-                self.storage[session_id] = (file_path, created_time)
+                self.storage[session_id] = (file_path, datetime.now(timezone.utc).timestamp())
 
             log.debug("Added session: %s with storage type: %s", 
                      session_id, 
-                     "R2" if self.r2_storage.enabled else "local")
+                     "R2 (uploading)" if self.r2_storage.enabled else "local")
 
     def __pop_session(self):
         if self.sessions:
@@ -163,7 +185,7 @@ class FileSession:
                             # For R2 storage, file_path is just the filename
                             filename = file_path.name if isinstance(file_path, pathlib.Path) else file_path
                             object_name = f"{session_id}/{filename}"
-                            self.r2_storage.delete_file(object_name)
+                            await s2a(self.r2_storage.delete_file)(object_name)
                         
                         # Handle cache cleanup (both Redis and in-memory)
                         if self.url_cache.enabled:
@@ -182,7 +204,7 @@ class FileSession:
                 except Exception as e:
                     log.error(f"Error removing session {session_id} from tracking: {e}")
 
-    def clear_sessions(self):
+    async def clear_sessions(self):
         """
         Emergency cleanup method to clear all sessions and their associated resources.
         This is important to prevent storage leaks and should be called during shutdown.
@@ -190,6 +212,15 @@ class FileSession:
         log.info("Emergency cleanup: Clearing all sessions...")
         cleaned = 0
         errors = 0
+
+        # Wait for any pending uploads to complete or timeout
+        if self._upload_tasks:
+            log.info(f"Waiting for {len(self._upload_tasks)} pending uploads to complete...")
+            for session_id, task in self._upload_tasks.items():
+                try:
+                    await task
+                except Exception as e:
+                    log.error(f"Error waiting for upload task {session_id}: {e}")
 
         while self.sessions:
             try:
@@ -211,7 +242,7 @@ class FileSession:
                             # For R2 storage, file_path[0] is just the filename
                             filename = file_path[0].name if isinstance(file_path[0], pathlib.Path) else file_path[0]
                             object_name = f"{session_id}/{filename}"
-                            self.r2_storage.delete_file(object_name)
+                            await s2a(self.r2_storage.delete_file)(object_name)
                         
                         # Always clean up cache
                         if self.url_cache.enabled:
