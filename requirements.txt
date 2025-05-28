@@ -4,7 +4,7 @@ pydantic
 asgiref
 Flask
 python-dotenv
-yt-dlp[default]>=2025.05.21.232935.dev0
+yt-dlp[default]>=2025.5.27.232941.dev0
 colorama
 aiohttp
 pycountry
