@@ -1,7 +1,7 @@
 from typing import Optional
 import asyncio
+from anyio.from_thread import start_blocking_portal
 import yt_dlp
-from pydantic import BaseModel
 import pathlib
 from logging import getLogger
 from manager.regex_manager.regex_manager import get_provider_from_url, is_youtube_playlist, resolve_url, normalize_facebook_url
@@ -12,6 +12,10 @@ from os import environ, path
 import tqdm
 log = getLogger(__name__)
 from manager.models.request_class import FormatInfo
+from manager.LRU_cache.format_cache import FormatCache
+from manager.ffmpeg.ffmpeg_tools import FFmpegTools
+import aiofiles
+import shutil
 
 def get_cookie_file(platform: str) -> str:
     """
@@ -58,6 +62,9 @@ default_formatData = [
         audio_format=None,
     )
 ]
+
+# We need to store the story data in a separate LRU cache
+story_cache = FormatCache(capacity=30, expire_seconds=-1)
 
 def build_story_format(story_data: dict) -> list[FormatInfo]:
     result: list[FormatInfo] = []
@@ -122,8 +129,12 @@ def build_story_format(story_data: dict) -> list[FormatInfo]:
                     note="Audio only track"
                 )
             )
+
+    story_cache.put_cached_format(story_data["url"], result, "Story-FB", None)
     
     return result
+
+ffmpeg_tools = FFmpegTools()
 
 if not environ.get("STORIE_API_URL"):
     fb_story_api_supported = False
@@ -150,15 +161,103 @@ async def fetch_story_data(fb_url: str, method: str = "html") -> dict:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url, headers=headers) as response:
                 if response.status == 200:
-                    print("✅ Success")
-                    return await response.json()
+                    response_data = await response.json()
+                    response_data["url"] = fb_url
+                    return response_data
                 else:
-                    print(f"❌ HTTP {response.status}")
-                    print(await response.text())
+                    log.error(f"❌ HTTP {response.status}")
+                    log.error(await response.text())
                     return {}
     except Exception as e:
-        print("❌ Error:", str(e))
+        log.error(f"❌ Error: {e}")
         return {}
+
+async def download_story_data(fb_url: str, format_id: str, output: pathlib.Path) -> dict:
+    cached_data = story_cache.get_cached_format(fb_url)
+    if not cached_data:
+        log.info("Fetching story data from API")
+        # Re-fetch it if cache miss
+        await fetch_story_data(fb_url)
+        # try to get it again
+        cached_data = story_cache.get_cached_format(fb_url)
+        if not cached_data:
+            # It so over
+            log.error(f"Failed to fetch story data for {fb_url}")
+            return {
+                "success": False,
+            }
+    async with aiohttp.ClientSession() as session:
+        for formats in cached_data:
+            for format in formats:
+                if format.format == format_id:
+                    rv = None
+                    ra = None
+                    if format.video_format:
+                        async with session.get(format.video_format) as response:
+                            if response.status == 200:
+                                rv = await response.read()
+
+                    if format.audio_format:
+                        async with session.get(format.audio_format) as response:
+                            if response.status == 200:
+                                ra = await response.read()
+
+                    sw = await story_worker(rv, ra, output)
+
+                    if sw:
+                        return {
+                            "success": True,
+                            "file_location": output
+                        }
+
+    return {
+        "success": False,
+    }
+
+async def story_worker(video_bytes: bytes = None, audio_bytes: bytes = None, output: pathlib.Path = None) -> bool:
+    # Write file first
+    if video_bytes and audio_bytes:
+        video_path = output / "video.mp4"
+        audio_path = output / "audio.mp3"
+        output_path = output / "output.mp4"
+
+        async with aiofiles.open(video_path, "wb") as fv, \
+                aiofiles.open(audio_path, "wb") as fa:
+            await asyncio.gather(
+                fv.write(video_bytes),
+                fa.write(audio_bytes)
+            )
+
+        # Ensure files exist and have correct sizes
+        await asyncio.sleep(0.1)  # Small delay to ensure OS flush
+
+        if not (video_path.exists() and audio_path.exists()):
+            log.error(f"Files don't exist: video={video_path.exists()}, audio={audio_path.exists()}")
+            return False
+
+        log.info(f"File sizes: video={video_path.stat().st_size}, audio={audio_path.stat().st_size}")
+
+        ffmpeg_task = ffmpeg_tools.merge_audio(str(video_path), str(audio_path), str(output_path))
+
+        if not ffmpeg_task:
+            return False
+
+        audio_path.unlink(missing_ok=True)
+        video_path.unlink(missing_ok=True)
+        return True
+
+
+    if video_bytes and not audio_bytes:
+        with open(output / "video.mp4", "wb") as fv:
+            fv.write(video_bytes)
+        
+        return True
+
+    if not video_bytes and audio_bytes:
+        with open(output / "audio.mp3", "wb") as fa:
+            fa.write(audio_bytes)
+        
+        return True
 
 def fetch_data(url: str, max_audio: int = 3, fetch_subtitle: bool = True) -> tuple[
     list[FormatInfo], str | None, Optional[SubtitleInfo]
@@ -187,7 +286,8 @@ def fetch_data(url: str, max_audio: int = 3, fetch_subtitle: bool = True) -> tup
 
     if platform == "facebook_story" and fb_story_api_supported:
         url = normalize_facebook_url(url)
-        story_data = asyncio.run(fetch_story_data(url))
+        with start_blocking_portal() as portal:
+            story_data = portal.call(fetch_story_data, url)
         return build_story_format(story_data), url, None
 
     if platform:
@@ -369,6 +469,7 @@ def hook_download(d):
                 bar.refresh()
                 bar.close()
                 del download_hooks[filename]
+                log.info(f"Downloaded {filename} ({total} bytes)")
     except Exception as e:
         log.error(f"Error in hook_download: {e}")
 
@@ -429,8 +530,16 @@ def run_yt_dlp_download(url: str, format_option: str, subtitle: str, output: pat
         url = resolve_url(url)
 
     if platform == "facebook_story" and fb_story_api_supported:
-        ... # Comming soon™
-
+        with start_blocking_portal() as portal:
+            story_status = portal.call(download_story_data, url, format_option, output)
+        if not story_status["success"]: # must've the wind
+            return {
+                "success": False,
+            }
+        return {
+            "success": True,
+            "file_location": output,
+        }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             ydl.download([yt_dlp.utils.sanitize_url(url)])
