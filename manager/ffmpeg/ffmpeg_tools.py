@@ -5,7 +5,7 @@ from logging import getLogger
 
 log = getLogger(__name__)
 
-class AudioVideoMerger:
+class FFmpegTools:
     """Class to handle merging audio into video files using FFmpeg"""
     
     def __init__(self):

@@ -30,6 +30,7 @@ from manager.configuation.config import *
 from manager.turnstiles_authentication.turnstile import Turnstile
 from manager.logging.logging_utils import LOGGING_CONFIG
 from logging import getLogger
+from manager.ffmpeg.ffmpeg_tools import FFmpegTools
 
 import random
 
@@ -329,6 +330,8 @@ class BaseApplication(FastAPI):
 
         if TURNSITE_VERIFICATION:
             self.turnstile = Turnstile(TURNSITE_SECRET_KEY)
+        
+        self.ffmpeg_tools = FFmpegTools()
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
