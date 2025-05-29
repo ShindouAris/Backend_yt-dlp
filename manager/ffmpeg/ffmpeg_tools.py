@@ -20,7 +20,7 @@ class FFmpegTools:
         except (subprocess.CalledProcessError, FileNotFoundError):
             raise RuntimeError("FFmpeg not found. Please install FFmpeg first.")
     
-    def merge_with_ffmpeg_python(self, video_path, audio_path, output_path, 
+    def merge_audio(self, video_path, audio_path, output_path, 
                                 replace_audio=True, audio_codec='aac'):
         """
         Merge audio into video using ffmpeg-python library
@@ -73,16 +73,20 @@ class FFmpegTools:
             log.info(f"Processing: {video_path} + {audio_path} -> {output_path}")
             ffmpeg.run(output, overwrite_output=True, quiet=False)
             log.info(f"✓ Successfully merged audio into video: {output_path}")
-            
+            return True
         except ffmpeg.Error as e:
             log.error(f"✗ FFmpeg error: {e}")
             if hasattr(e, 'stderr') and e.stderr:
                 log.error(f"Error details: {e.stderr.decode()}")
+            return False
         except FileNotFoundError as e:
             log.error(f"✗ File error: {e}")
+            return False
         except Exception as e:
             log.error(f"✗ Unexpected error: {e}")
+            return False
     
+
     def adjust_audio_sync(self, video_path, audio_path, output_path, 
                          audio_delay=0.0, audio_codec='aac'):
         """
