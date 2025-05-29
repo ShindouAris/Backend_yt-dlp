@@ -10,7 +10,7 @@ import uuid
 import os
 import pathlib
 from asgiref.sync import sync_to_async as s2a
-from asyncio import sleep, create_task, TimeoutError as AsyncTimeoutError
+from asyncio import sleep, create_task, TimeoutError as AsyncTimeoutError, wait_for, Timeout, CancelledError
 from shutil import rmtree
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -484,7 +484,17 @@ class BaseApplication(FastAPI):
                 # If R2 storage is enabled, try to upload the file
                 if self.file_session.r2_storage.enabled:
                     object_name = f"{session_id}/{filename}"
-                    if await s2a(self.file_session.r2_storage.upload_file)(str(full_file_path), object_name):
+
+                    try:
+                        upload_success = await wait_for(s2a(self.file_session.r2_storage.upload_file)(str(full_file_path), object_name), timeout=70)
+                    except (Timeout, CancelledError):
+                        log.error(f"Upload to R2 timed out for session {session_id}")
+                        upload_success = False
+                    except Exception as e:
+                        log.error(f"Error uploading to R2: {e}")
+                        upload_success = False
+
+                    if upload_success:
                         # File uploaded to R2 successfully, delete local copy
                         rmtree(output)
                         # Cache the file information
