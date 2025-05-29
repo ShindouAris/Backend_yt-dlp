@@ -481,7 +481,7 @@ class BaseApplication(FastAPI):
                 # If R2 storage is enabled, try to upload the file
                 if self.file_session.r2_storage.enabled:
                     object_name = f"{session_id}/{filename}"
-                    if self.file_session.r2_storage.upload_file(str(full_file_path), object_name):
+                    if await s2a(self.file_session.r2_storage.upload_file)(str(full_file_path), object_name):
                         # File uploaded to R2 successfully, delete local copy
                         rmtree(output)
                         # Cache the file information
