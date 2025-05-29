@@ -50,6 +50,7 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 - **CORS Enabled**: Allows requests from specified origins.
 - **R2 Storage Integration**: Optional Cloudflare R2 storage for efficient file handling.
 - **URL Caching**: Redis or in-memory caching for faster repeat downloads.
+- **Cloudflare Turnstile**: Optional Cloudflare Turnstile verification for enhanced security.
 
 ---
 
@@ -65,6 +66,10 @@ Backend_yt-dlp/
 │   ├── LRU_cache/
 │   │   ├── LRU_NODE.py
 │   │   └── format_cache.py
+│   ├── configuation/
+│   │   └── config.py
+│   ├── turnstiles_authentication/
+│   │   └── turnstile.py
 │   ├── database_utils/
 │   │   ├── r2_storage.py
 │   │   └── url_cache.py
@@ -107,6 +112,7 @@ Backend_yt-dlp/
 4.  **REQUIRED** FFMPEG: for merge audio file with video file. Must be installed and available in your system's PATH. See [Install FFmpeg](#5-install-ffmpeg-required) for instructions.
 5.  **(Optional) Google API Key**: For using the `/geo_check` endpoint. Must be set as `YOUTUBE_V3_APIKEY` environment variable.
 6.  **(Optional) Render Account**: If you plan to host the application on Render.
+7.  **(Optional) Cloudflare Turnstile**: For using the `/download` endpoint. Must be set as `TURNSITE_VERIFICATION` and `TURNSITE_API_SECRECT_KEY` environment variable.
 
 ---
 
@@ -164,7 +170,7 @@ RATE_LIMIT=150
 RATE_WINDOW=60
 
 # Time in seconds before downloaded files are automatically deleted
-FILE_EXPIRE_TIME=300
+FILE_EXPIRE_TIME=1800
 
 # DISABLE AUTOMATIC FILE DELETION
 KEEP_LOCAL_FILES=false
@@ -178,6 +184,35 @@ ALLOWED_ORIGINS=*
 # Multiple origins can be specified using || as separator
 # Use "*" to allow all origins (not recommended for production)
 FORWARDED_ORIGINS=*
+
+# Cloudflare Turnstile Configuration
+# Enable/disable Turnstile verification for download requests
+# Set to "true" to require Turnstile verification, "false" to disable
+# Default: false
+TURNSITE_VERIFICATION=false
+
+# Cloudflare Turnstile secret key for server-side verification
+# Required if TURNSITE_VERIFICATION is true
+# Get this from your Cloudflare Turnstile dashboard
+TURNSITE_API_SECRECT_KEY=your_turnstile_secret_key_here
+
+# R2 Storage Configuration
+USE_R2_STORAGE=false
+R2_ACCOUNT_ID=your_account_id
+R2_ACCESS_KEY_ID=your_access_key_id
+R2_SECRET_ACCESS_KEY=your_secret_access_key
+R2_BUCKET_NAME=your_bucket_name
+
+# Redis Cache Configuration
+USE_REDIS_CACHE=false
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+
+
+# API FOR FB STORY
+# https://github.com/teppyboy/storiee.git
+STORIE_API_URL=
 ```
 - The application loads these variables using `python-dotenv`.
 - If `DEVELOPMENT` is `true`, API documentation (Swagger UI at `/docs`, ReDoc at `/redoc`) will be available. These are disabled in production mode.
@@ -717,9 +752,10 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 
 ## Troubleshooting
 
-1.  **403 Forbidden (Invalid or missing token)** for `/download` or `/geo_check`:
+1.  **403 Forbidden (Invalid or missing token or Invalid turnstile token)** for `/download` or `/geo_check`:
     *   Ensure you are sending the `Authorization` header correctly: `Authorization: Bearer <your_token>`.
     *   Verify that `<your_token>` matches the `SECRET_PRODUCTION_KEY` value set in your `.env` file (or Render environment variables).
+    *   If you are using Turnstile, ensure you are sending the `cf-turnstile-token` correctly: `cf-turnstile-token: <your_token>`.
 2.  **429 Too Many Requests**:
     *   Your IP has exceeded the configured rate limit. Wait for the `RATE_WINDOW` duration before trying again.
     *   If self-hosting, you can adjust `RATE_LIMIT` and `RATE_WINDOW` in your `.env` file.
@@ -758,7 +794,7 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 ## FAQ
 
 1. **How do I change the download format?**
-    -   Call `/get_all_format` to list formats. Use the `format` string (e.g., `"137+140"`) from that response in the `/download` request body. Defaults to `"bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"` if `format` is omitted.
+    -   Call `/fetch_data` to list formats. Use the `format` string (e.g., `"137+140"`) from that response in the `/download` request body. Defaults to `"bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"` if `format` is omitted.
 
 2. **Can I download playlists?**
     -   No, this API is for single video downloads (~~Planning for multiple download later~~).
@@ -798,6 +834,11 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
    - Useful for long-term storage or manual review of downloaded content
    - Note: This may not work when using R2 storage, as files are uploaded and not stored locally
    - Note: This will increase disk usage, so ensure sufficient storage is available
+
+10. **How do I use Cloudflare Turnstile?**
+    - Set `TURNSITE_VERIFICATION=true` in your `.env` file
+    - Set `TURNSITE_API_SECRECT_KEY` in your `.env` file
+    - Add the `cf-turnstile-token` to your `/download` request
 
 ---
 ## License

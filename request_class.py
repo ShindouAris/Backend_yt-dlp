@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 from manager.ytdlp_tool.ytdl_tools import FormatInfo
 from manager.models.subtitle_model import SubtitleInfo
+from manager.configuation.config import TURNSITE_VERIFICATION
 
 class DownloadResponse(BaseModel):
     message: str
@@ -16,6 +17,8 @@ class DownloadRequest(BaseModel):
     url: str
     format: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"
     subtitle: str | None = None
+    if TURNSITE_VERIFICATION:
+        cf_turnstile_token: str | None = None
 
 class FormatRequest(BaseModel):
     url: str

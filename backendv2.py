@@ -26,7 +26,8 @@ from request_class import DownloadRequest, FormatRequest, DataResponse, Download
 from manager.database_utils.r2_storage import R2Storage
 from manager.database_utils.url_cache import URLCache
 from manager.LRU_cache.format_cache import FormatCache
-
+from manager.configuation.config import *
+from manager.turnstiles_authentication.turnstile import Turnstile
 from manager.logging.logging_utils import LOGGING_CONFIG
 from logging import getLogger
 
@@ -35,29 +36,6 @@ import random
 
 load_dotenv()
 log = getLogger(__name__)
-
-PROJECT_ROOT = pathlib.Path(__file__).parent
-DOWNLOAD_FOLDER = pathlib.Path('downloads')
-DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split("||")
-UVICORN_FORWARDED_ORIGINS = os.environ.get("FORWARDED_ORIGINS", "*").split("||")
-ENABLE_TROLLING_ROUTE = os.environ.get("ENABLE_TROLLING_ROUTE", "False").lower() == "true"
-DISABLE_AUTO_CLEANUP = os.environ.get("KEEP_LOCAL_FILES", "False").lower() == "true"
-
-if os.environ.get("FILE_EXPIRE_TIME") is not None and os.environ.get("FILE_EXPIRE_TIME").isdigit():
-    FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
-else:
-    FILE_EXPIRE_TIME: int = 300
-
-IS_DEVELOPMENT = os.environ.get("DEVELOPMENT", "False").lower() == "true"
-if not IS_DEVELOPMENT:
-    SECRET_PRODUCTION_KEY = os.environ.get("SECRET_PRODUCTION_KEY", "youshallnotpassanysecretkey")
-    RATE_LIMIT = int(os.environ.get("RATE_LIMIT", 150))
-    RATE_WINDOW = int(os.environ.get("RATE_WINDOW", 60))
-else:
-    SECRET_PRODUCTION_KEY = "when_the_pig_fly"
-    RATE_LIMIT = 1000
-    RATE_WINDOW = 0
 
 rate_limit_cache: Dict[str, list] = {}
 
@@ -349,6 +327,9 @@ class BaseApplication(FastAPI):
         self.file_session = FileSession()
         self.uptime = datetime.now(timezone.utc)
 
+        if TURNSITE_VERIFICATION:
+            self.turnstile = Turnstile(TURNSITE_SECRET_KEY)
+
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         """
@@ -455,10 +436,16 @@ class BaseApplication(FastAPI):
             log.error("An error occurred while fetching data:", str(e))
             raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
-    async def download_video(self, request_data: DownloadRequest):
+    async def download_video(self, request_data: DownloadRequest, request: Request):
         url = request_data.url
         format_option = request_data.format
         subtitle = request_data.subtitle or None
+        if TURNSITE_VERIFICATION:
+            if not request_data.cf_turnstile_token:
+                raise HTTPException(status_code=400, detail="Turnstile token is required")
+            is_valid = await self.turnstile.verify_token(request_data.cf_turnstile_token, request.client.host)
+            if not is_valid:
+                raise HTTPException(status_code=403, detail="Invalid turnstile token")
 
         if not url:
             raise HTTPException(status_code=400, detail="URL is required")
