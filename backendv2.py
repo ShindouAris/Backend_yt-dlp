@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from manager.ytdlp_tool.ytdl_tools import fetch_data, run_yt_dlp_download
 from manager.geo_utils.geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
-from request_class import DownloadRequest, FormatRequest, DataResponse, DownloadResponse
+from manager.models.request_class import DownloadRequest, FormatRequest, DataResponse, DownloadResponse
 from manager.database_utils.r2_storage import R2Storage
 from manager.database_utils.url_cache import URLCache
 from manager.LRU_cache.format_cache import FormatCache

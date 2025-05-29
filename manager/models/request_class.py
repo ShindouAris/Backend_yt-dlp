@@ -28,3 +28,11 @@ class DataResponse(BaseModel):
     name: str
     formats: list[FormatInfo]
     subtitle_info: SubtitleInfo | None = None
+
+class FormatInfo(BaseModel):
+    type: str
+    format: str
+    label: str
+    video_format: str | None = None
+    audio_format: str | None = None
+    note: str | None = None

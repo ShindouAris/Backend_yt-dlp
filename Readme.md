@@ -80,6 +80,7 @@ Backend_yt-dlp/
 │   ├── logging/
 │   │   └── logging_utils.py
 │   ├── models/
+│   │   ├── request_class.py
 │   │   └── subtitle_model.py
 │   ├── regex_manager/
 │   │   └── regex_manager.py
@@ -98,7 +99,6 @@ Backend_yt-dlp/
 ├── backendv2.py
 ├── cookie.example.txt
 ├── example.env
-├── request_class.py
 └── requirements.txt
 ```
 

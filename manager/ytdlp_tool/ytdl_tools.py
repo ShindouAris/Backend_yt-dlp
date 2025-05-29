@@ -11,14 +11,7 @@ import urllib.parse
 from os import environ, path
 import tqdm
 log = getLogger(__name__)
-
-class FormatInfo(BaseModel):
-    type: str
-    format: str
-    label: str
-    video_format: str | None = None
-    audio_format: str | None = None
-    note: str | None = None
+from manager.models.request_class import FormatInfo
 
 def get_cookie_file(platform: str) -> str:
     """
