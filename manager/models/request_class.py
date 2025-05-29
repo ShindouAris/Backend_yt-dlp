@@ -22,11 +22,6 @@ class FormatRequest(BaseModel):
     url: str
     fetch_subtitle: bool = False
 
-class DataResponse(BaseModel):
-    name: str
-    formats: list[FormatInfo]
-    subtitle_info: SubtitleInfo | None = None
-
 class FormatInfo(BaseModel):
     type: str
     format: str
@@ -34,3 +29,8 @@ class FormatInfo(BaseModel):
     video_format: str | None = None
     audio_format: str | None = None
     note: str | None = None
+    
+class DataResponse(BaseModel):
+    name: str
+    formats: list[FormatInfo]
+    subtitle_info: SubtitleInfo | None = None
