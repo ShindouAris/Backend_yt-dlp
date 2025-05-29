@@ -1,6 +1,4 @@
 from pydantic import BaseModel
-
-from manager.ytdlp_tool.ytdl_tools import FormatInfo
 from manager.models.subtitle_model import SubtitleInfo
 from manager.configuation.config import TURNSITE_VERIFICATION
 
