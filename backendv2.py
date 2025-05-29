@@ -38,6 +38,9 @@ import random
 load_dotenv()
 log = getLogger(__name__)
 
+PROJECT_ROOT = pathlib.Path(__file__).parent
+DOWNLOAD_FOLDER = pathlib.Path('downloads')
+DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 rate_limit_cache: Dict[str, list] = {}
 
 def is_rate_limited(ip: str) -> bool:
@@ -301,8 +304,8 @@ class BaseApplication(FastAPI):
                         redoc_url="/redoc" if IS_DEVELOPMENT else None,
                         openapi_url="/openapi.json" if IS_DEVELOPMENT else None)
 
-        self.add_api_route("/fetch_data", self.get_all_formats, response_model=DataResponse, methods=["POST"],
-                            dependencies=[Depends(verify_token)])
+        self.add_api_route("/fetch_data", self.fetch_data, response_model=DataResponse, methods=["POST"],
+                           dependencies=[Depends(verify_token)])
 
         self.add_api_route("/download", self.download_video, methods=["POST"]
                             , response_model=DownloadResponse, dependencies=[Depends(verify_token)])
@@ -403,7 +406,7 @@ class BaseApplication(FastAPI):
 
         return check
 
-    async def get_all_formats(self, request: FormatRequest):
+    async def fetch_data(self, request: FormatRequest):
         url = request.url
         fetch_subtitle = request.fetch_subtitle or False
 
@@ -425,7 +428,7 @@ class BaseApplication(FastAPI):
             formats, file_name, subtitle_info = await s2a(fetch_data)(url, max_audio=3, fetch_subtitle=fetch_subtitle)
             if not formats:
                 log.error(f"Fail to load formats for {url}")
-                raise HTTPException(status_code=404, detail="No formats found")
+                return Response(status_code=404, content="No formats found")
             
             # Cache the format information
             self.file_session.format_cache.put_cached_format(url, formats, file_name, subtitle_info)
@@ -568,7 +571,7 @@ class BaseApplication(FastAPI):
         ]
         for ext in preferred_extensions:
             for f in requested_path.glob(f"*.{ext}"):
-                if f.is_file():
+                if f.exists() and f.is_file():
                     return FileResponse(path=f, filename=f.name, media_type='application/octet-stream')
 
         return HTMLResponse(content=open("template/gomen.html").read())

@@ -4,11 +4,6 @@ import pathlib
 
 load_dotenv()
 
-
-
-PROJECT_ROOT = pathlib.Path(__file__).parent
-DOWNLOAD_FOLDER = pathlib.Path('downloads')
-DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split("||")
 UVICORN_FORWARDED_ORIGINS = os.environ.get("FORWARDED_ORIGINS", "*").split("||")
 ENABLE_TROLLING_ROUTE = os.environ.get("ENABLE_TROLLING_ROUTE", "False").lower() == "true"
