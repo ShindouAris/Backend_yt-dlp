@@ -209,6 +209,10 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=your_redis_password
 
+# Limiting download files size
+# IN MB
+# Under is 4GB 
+MAX_FILE_SIZE=4096
 
 # API FOR FB STORY
 # https://github.com/teppyboy/storiee.git
@@ -223,27 +227,44 @@ STORIE_API_URL=
 
 To download videos from websites requiring authentication (e.g., YouTube private videos, age-restricted content) or to help bypass "robot checks" which can lead to HTTP 429 errors from YouTube, you'll need a `cookies.txt` file.
 
-#### Steps to get `cookies.txt` from YouTube:
+#### Steps to get `cookies.txt` from YouTube or other platforms:
+
+> # List of platforms that require cookies:
+> - YouTube (cookie.txt) (Required for youtube on DatacenterIP)
+> - TikTok (tiktok_cookie.txt)
+> - Instagram (instagram_cookie.txt) (Need if you can't download video)
+> - Facebook (facebook_cookie.txt) (Need if you can't download video)
+> - X (X_cookie.txt) (Need if you can't download video)
 
 > [!CAUTION]
 > - **Security Risk**: Using cookies with high traffic can lead to YouTube account bans
 > - **Best Practice**: Use a throwaway account or avoid using cookies entirely
 > - **Hosting Limitation**: YouTube downloads may fail on cloud platforms (Render, Azure, GitLab, etc.) if cookie is not use
 
+
 1.  Install the **Cookie-Editor** browser extension:
     *   [Chrome Web Store](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)
     *   [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)
+> Youtube only
 2.  Open a new private browsing/incognito window and log into YouTube.
 3.  In the same window and same tab from step 2, navigate to:
     `https://www.youtube.com/robots.txt`
     (It's recommended this be the only private/incognito browsing tab open to isolate the session cookies).
 4.  Open the Cookie-Editor extension, select **Export**, then **Netscape**, and copy the cookies to your clipboard.
-5.  Create a file named `cookies.txt` in the root directory of this project (i.e., at the same level as `backendv2.py`).
-6.  Paste the copied cookie data into this `cookies.txt` file and save it.
+5.  Create a file named `cookie.txt` in the root directory of this project (i.e., at the same level as `backendv2.py`).
+6.  Paste the copied cookie data into this `cookie.txt` file and save it.
 7.  Close the private browsing/incognito window so that the session is never opened in the browser again (this helps preserve the validity of the exported cookies).
 
+> others platform (TikTok, Instagram, Facebook, X)
+2. In the platform you want to extract cookie from, Open the Cookie-Editor extension, select **Export**, then **Netscape**, and copy the cookies to your clipboard.
+3. Create a file named `{platform}_cookie.txt` in the root directory of this project (i.e., at the same level as `backendv2.py`).
+4. Paste the copied cookie data into this `{platform}_cookie.txt` file and save it.
+
+> [!INFO]
+> IF your service is not listed above, you can paste the cookie into `yt_dlp_mixed_cookie.txt` file to provide support for that page.
+
 > [!IMPORTANT]
-> *   The `cookies.txt` file **must** be in the Netscape HTTP Cookie File format.
+> *   The `cookie.txt` file **must** be in the Netscape HTTP Cookie File format.
 > *   The very first line of the file **must** be either `# HTTP Cookie File` or `# Netscape HTTP Cookie File`.
 > *   The path to this cookie file is specified in `backendv2.py` as `cookiefile="./cookie.txt"`.
 
@@ -349,6 +370,11 @@ The base URL for local development is `http://127.0.0.1:8000`.
 `Authorization: Bearer <YOUR_SECRET_PRODUCTION_KEY>`
 The `<YOUR_SECRET_PRODUCTION_KEY>` is the value you set in your `.env` file or the default if not set.
 
+> [!IMPORTANT]  
+> **Turnstile**: If `TURNSITE_VERIFICATION` is set to `true` in your `.env` file, Endpoint marked with `[Cloudflare Turnstile]` will require a `cf-turnstile-token` in the
+`body` of the request.
+`
+
 > [!WARNING]  
 > **Rate Limiting**: All endpoints are subject to IP-based rate limiting. If the limit (defined by `RATE_LIMIT` and `RATE_WINDOW` in `.env`) is exceeded, the API will respond with HTTP status `429 Too Many Requests`.
 
@@ -410,7 +436,7 @@ Fetches available download formats and subtitle information for a given video UR
   }
   ```
 
-### 3. **POST** `/download` `[Protected]`
+### 3. **POST** `/download` `[Protected]` `[Cloudflare Turnstile]`
 
 Initiates a video download with optional subtitle embedding. Requires Bearer token authentication.
 
@@ -419,7 +445,8 @@ Initiates a video download with optional subtitle embedding. Requires Bearer tok
   {
     "url": "https://www.youtube.com/watch?v=example",
     "format": "313+251",  // Defaults to "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" if not provided
-    "subtitle": "en"      // Optional: Language code for subtitle embedding (e.g., "en", "ja", "ko")
+    "subtitle": "en",      // Optional: Language code for subtitle embedding (e.g., "en", "ja", "ko")
+    "cf-turnstile-token": "your_turnstile_token_here"
   }
   ```
 - **Successful Response** (JSON, `DownloadResponse`):
@@ -731,7 +758,7 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 
 -   **`SECRET_PRODUCTION_KEY`**: This is your API's master key for protected endpoints. Keep it secret and make it strong, especially in production. The defaults are for convenience, not security.
 -   **API Docs in Production**: If `DEVELOPMENT` is `false` (recommended for production), the API docs at `/docs`, `/redoc`, and `/openapi.json` are disabled for security. Set `DEVELOPMENT=true` locally to view them.
--   **`cookies.txt`**: Still vital for accessing content requiring login or bypassing bot checks. Cookies expire, so update `cookies.txt` periodically.
+-   **`cookie.txt`**: Still vital for accessing content requiring login or bypassing bot checks. Cookie may expire, so update `cookie.txt` if you can't download anymore.
 -   **`downloads` Folder**: Ephemeral storage. Files are auto-deleted (default 5 mins).
 -   **CORS Origins**: Update `allow_origins` in `backendv2.py` if your frontend is on a different domain.
 
@@ -789,6 +816,11 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
 10. **Download folder is filling up with old files**
     * Ensure you doesn't have `KEEP_LOCAL_FILES=true` in your `.env` file unless you want to keep all downloaded files.
 
+11. **I can't download `X/Y` files, it keep saying "File size limit exceeded"**
+    * Ensure you have set the `MAX_FILE_SIZE` in your `.env` file to a value greater than the file you are trying to download.
+    * The default is 4GB, if you want to change it, set the `MAX_FILE_SIZE` to the desired value in MB.
+    * The `MAX_FILE_SIZE` is in MB.
+
 ---
 
 ## FAQ
@@ -839,6 +871,20 @@ Click **Create Web Service**. Monitor logs via **Events** or **Logs** tab. Once 
     - Set `TURNSITE_VERIFICATION=true` in your `.env` file
     - Set `TURNSITE_API_SECRECT_KEY` in your `.env` file
     - Add the `cf-turnstile-token` to your `/download` request
+
+11. **I want to limit the size of the downloaded file, How do I do that?**
+    - Set `MAX_FILE_SIZE` in your `.env` file
+    - This will limit the size of the downloaded file to the specified size
+
+---
+
+## TODO:
+
+- [ ] Add support for playlists
+- [X] WEB-UI
+- [X] Add support for subtitles
+- [X] Add support for cookies
+- [X] File check
 
 ---
 ## License
