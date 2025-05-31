@@ -20,7 +20,7 @@ import yt_dlp
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from manager.ytdlp_tool.ytdl_tools import fetch_data, run_yt_dlp_download
+from manager.ytdlp_tool.ytdl_tools import YTDLP_TOOLS
 from manager.geo_utils.geoblock_checker import is_geo_restricted, get_video_id, GeoblockData
 from manager.models.request_class import DownloadRequest, FormatRequest, DataResponse, DownloadResponse
 from manager.database_utils.r2_storage import R2Storage
@@ -329,12 +329,13 @@ class BaseApplication(FastAPI):
         self.add_middleware(RateLimitMiddleware)
 
         self.file_session = FileSession()
+        self.ffmpeg_tools = FFmpegTools()
+        self.ytdlp_tools = YTDLP_TOOLS(self)
         self.uptime = datetime.now(timezone.utc)
 
         if TURNSITE_VERIFICATION:
             self.turnstile = Turnstile(TURNSITE_SECRET_KEY)
         
-        self.ffmpeg_tools = FFmpegTools()
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -425,7 +426,7 @@ class BaseApplication(FastAPI):
                 )
 
             # If not in cache, fetch from yt-dlp
-            formats, file_name, subtitle_info = await s2a(fetch_data)(url, max_audio=3, fetch_subtitle=fetch_subtitle)
+            formats, file_name, subtitle_info = await s2a(self.ytdlp_tools.fetch_data)(url, max_audio=3, fetch_subtitle=fetch_subtitle)
             if not formats:
                 log.error(f"Fail to load formats for {url}")
                 return Response(status_code=404, content="No formats found")
@@ -478,7 +479,7 @@ class BaseApplication(FastAPI):
         output.mkdir(parents=True, exist_ok=True)
 
         try:
-            result = await s2a(run_yt_dlp_download)(url, format_option, subtitle, output)
+            result = await s2a(self.ytdlp_tools.run_yt_dlp_download)(url, format_option, subtitle, output)
 
             if result["success"]:
                 filename = resolve_file_name_from_folder(str(output))
@@ -530,6 +531,13 @@ class BaseApplication(FastAPI):
             else:
                 if output.exists():
                     rmtree(output)
+
+                if result.get("error"):
+                    return Response(
+                        content=result.get("error"),
+                        status_code=500
+                    )
+                
                 return Response(
                     content="Download failed",
                     status_code=500
