@@ -28,7 +28,7 @@ def get_provider_from_url(url: str) -> str :
         else:
             if re.search(patterns, url):
                 return provider
-    return "Unknown"
+    return "yt_dlp_mixed"
 
 def is_youtube_playlist(url: str) -> bool:
     return bool(re.search(yt_list_pattern, url))
