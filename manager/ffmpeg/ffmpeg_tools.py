@@ -10,7 +10,8 @@ class FFmpegTools:
     
     def __init__(self):
         self.check_ffmpeg()
-    
+        self.has_ffmpeg = True
+
     def check_ffmpeg(self):
         """Check if FFmpeg is installed"""
         try:
@@ -18,6 +19,8 @@ class FFmpegTools:
                          capture_output=True, check=True)
             log.info("✓ FFmpeg is available")
         except (subprocess.CalledProcessError, FileNotFoundError):
+            log.error("✗ FFmpeg is not installed or not found in PATH")
+            self.has_ffmpeg = False
             raise RuntimeError("FFmpeg not found. Please install FFmpeg first.")
     
     def merge_audio(self, video_path, audio_path, output_path, 
@@ -32,6 +35,9 @@ class FFmpegTools:
             replace_audio: If True, replace existing audio. If False, mix with existing
             audio_codec: Audio codec to use (aac, mp3, etc.)
         """
+        if not self.has_ffmpeg:
+            log.error("FFmpeg is not available. Cannot perform merge operation.")
+            return False
         try:
             # Validate input files
             if not os.path.exists(video_path):
@@ -99,6 +105,9 @@ class FFmpegTools:
             audio_delay: Delay in seconds (positive = delay, negative = advance)
             audio_codec: Audio codec to use
         """
+        if not self.has_ffmpeg:
+            log.error("FFmpeg is not available. Cannot perform sync adjustment.")
+            return
         try:
             video_input = ffmpeg.input(video_path)
             audio_input = ffmpeg.input(audio_path)
@@ -130,6 +139,9 @@ class FFmpegTools:
             subtitle_path: Path to input subtitle file
             output_path: Path for output file
         """
+        if not self.has_ffmpeg:
+            log.error("FFmpeg is not available. Cannot add subtitle track.")
+            return
         try:
             if not os.path.exists(video_path):
                 raise FileNotFoundError(f"Video file not found: {video_path}")
@@ -167,6 +179,9 @@ class FFmpegTools:
             output_path: Path for output file
             preset: FFmpeg preset for encoding speed (options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
         """
+        if not self.has_ffmpeg:
+            log.error("FFmpeg is not available. Cannot add burned-in subtitle.")
+            return
         try:
             if not os.path.exists(video_path):
                 raise FileNotFoundError(f"Video file not found: {video_path}")
