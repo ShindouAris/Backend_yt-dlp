@@ -19,7 +19,7 @@ class FFmpegTools:
                          capture_output=True, check=True)
             log.info("✓ FFmpeg is available")
         except (subprocess.CalledProcessError, FileNotFoundError):
-            log.error("✗ FFmpeg is not installed or not found in PATH")
+            log.warning("✗ FFmpeg is not installed or not found in PATH")
             self.has_ffmpeg = False
             raise RuntimeError("FFmpeg not found. Please install FFmpeg first.")
     

@@ -15,7 +15,11 @@ from manager.models.request_class import FormatInfo
 from manager.LRU_cache.format_cache import FormatCache  
 import aiofiles
 from manager.configuation.config import MAX_FILE_SIZE
-from fastapi import FastAPI
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backendv2 import BaseApplication
+
 default_formatData = [
     FormatInfo(
         type="video+audio",
@@ -49,12 +53,18 @@ else:
     fb_story_api_supported = True
 
 class YTDLP_TOOLS:      
-    def __init__(self, app: FastAPI):
-        self.app = app
+    def __init__(self, app = None):
+        self.app: "BaseApplication" = app
         self.story_cache = FormatCache(capacity=30, expire_seconds=-1)
         self.download_hooks = {}
+        if self.app:
+            self.ffmpeg_tools = self.app.ffmpeg_tools
+        else:
+            from manager.ffmpeg.ffmpeg_tools import FFmpegTools
+            self.ffmpeg_tools = FFmpegTools()
 
-    def get_cookie_file(self, platform: str) -> str:
+    @staticmethod
+    def get_cookie_file(platform: str) -> str | None:
         """
         Returns the path to the cookie file for a given platform.
         """
@@ -73,7 +83,6 @@ class YTDLP_TOOLS:
                 return None # Story isn't fetch from yt-dlp, use api instead
             case _:
                 return f"./{str(platform).lower().replace(' ', '_')}_cookie.txt"
-
 
     def build_story_format(self, story_data: dict) -> list[FormatInfo]:
         result: list[FormatInfo] = []
@@ -143,8 +152,8 @@ class YTDLP_TOOLS:
         
         return result
 
-
-    async def fetch_story_data(self, fb_url: str, method: str = "html") -> dict:
+    @staticmethod
+    async def fetch_story_data(fb_url: str, method: str = "html") -> dict:
         try:
             normalized_url = normalize_facebook_url(fb_url)
 
@@ -218,8 +227,11 @@ class YTDLP_TOOLS:
         }
 
     async def story_worker(self, video_bytes: bytes = None, audio_bytes: bytes = None, output: pathlib.Path = None) -> bool:
-        # Write file first
         if video_bytes and audio_bytes:
+            if not self.ffmpeg_tools.has_ffmpeg:
+                log.error("FFmpeg is not available. Cannot merge video and audio.")
+                return False
+
             video_path = output / "video.mp4"
             audio_path = output / "audio.mp3"
             output_path = output / "output.mp4"
@@ -231,8 +243,7 @@ class YTDLP_TOOLS:
                     fa.write(audio_bytes)
                 )
 
-            # Ensure files exist and have correct sizes
-            await asyncio.sleep(0.1)  # Small delay to ensure OS flush
+            await asyncio.sleep(0.1)
 
             if not (video_path.exists() and audio_path.exists()):
                 log.error(f"Files don't exist: video={video_path.exists()}, audio={audio_path.exists()}")
@@ -240,7 +251,7 @@ class YTDLP_TOOLS:
 
             log.info(f"File sizes: video={video_path.stat().st_size}, audio={audio_path.stat().st_size}")
 
-            ffmpeg_task = self.app.ffmpeg_tools.merge_audio(str(video_path), str(audio_path), str(output_path))
+            ffmpeg_task = self.ffmpeg_tools.merge_audio(str(video_path), str(audio_path), str(output_path))
 
             if not ffmpeg_task:
                 return False
