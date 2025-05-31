@@ -3,6 +3,10 @@
 This project provides a FastAPI-based API for downloading videos using `yt-dlp`. It features Bearer token authentication for key endpoints, rate limiting, session management for downloads, automatic file cleanup, and can utilize cookies for downloading videos from platforms requiring login.
 
 ---
+## HOW NEW VERSION WORK (demo only, may not be accurate)
+<img src="assets/visual_drawing.excalidraw.png" alt="how_this_update_works">
+
+---
 
 ### 📚 Navigation
 
