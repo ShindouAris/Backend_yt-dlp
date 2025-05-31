@@ -10,7 +10,7 @@ ENABLE_TROLLING_ROUTE = os.environ.get("ENABLE_TROLLING_ROUTE", "False").lower()
 DISABLE_AUTO_CLEANUP = os.environ.get("KEEP_LOCAL_FILES", "False").lower() == "true"
 TURNSITE_VERIFICATION = os.environ.get("TURNSITE_VERIFICATION", "False").lower() == "true"
 TURNSITE_SECRET_KEY = os.environ.get("TURNSITE_API_SECRECT_KEY", "youshallnotpassanysecretkey")
-
+MAX_FILE_SIZE = int(os.environ.get("MAX_FILE_SIZE", 1024))
 
 if os.environ.get("FILE_EXPIRE_TIME") is not None and os.environ.get("FILE_EXPIRE_TIME").isdigit():
     FILE_EXPIRE_TIME: int = int(os.environ.get("FILE_EXPIRE_TIME"))
