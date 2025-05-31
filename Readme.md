@@ -440,7 +440,7 @@ Fetches available download formats and subtitle information for a given video UR
   }
   ```
 
-### 3. **POST** `/download` `[Protected]` `[Cloudflare Turnstile]`
+### 3. **POST** `/download` `[Protected]` `[Cloudflare Turnstile]` `[Breaking Change v2.0.0]`
 
 Initiates a video download with optional subtitle embedding. Requires Bearer token authentication.
 
