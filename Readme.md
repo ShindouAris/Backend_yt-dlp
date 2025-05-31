@@ -264,7 +264,7 @@ To download videos from websites requiring authentication (e.g., YouTube private
 3. Create a file named `{platform}_cookie.txt` in the root directory of this project (i.e., at the same level as `backendv2.py`).
 4. Paste the copied cookie data into this `{platform}_cookie.txt` file and save it.
 
-> [!INFO]
+> [!NOTE]
 > IF your service is not listed above, you can paste the cookie into `yt_dlp_mixed_cookie.txt` file to provide support for that page.
 
 > [!IMPORTANT]
