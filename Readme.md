@@ -19,9 +19,11 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 * [📡 API Endpoints](#api-endpoints)
     * [`/`](#1-get--head-)
     * [`/fetch_data`](#2-post-fetch_data-protected)
-    * [`/download`](#3-post-download-protected-cloudflare-turnstile-breaking-change-v200)
+    * [`/download`](#3-post-download-protected-cloudflare-turnstile)
     * [`/files/<session_id>`](#4-get-filessession_id)
     * [`/geo_check`](#5-post-geo_check-protected)
+* [📞 WebSocket](#websocket)
+    * [`/ws`](#1-ws-websocket-connection-protected-cloudflare-turnstile-demo-v2-only-may-change-in-the-future)
 * [☁️ Storage Configuration](#storage-configuration)
     * [R2 Storage](#r2-storage)
     * [URL Caching](#url-caching)
@@ -455,10 +457,13 @@ Initiates a video download with optional subtitle embedding. Requires Bearer tok
   ```
 - **Successful Response** (JSON, `DownloadResponse`):
   ```json
-  {
-    "message": "Session created - Please connect to the websocket to get the download link",
-    "session_id": "550e8400-e29b-41d4-a716-446655440000" // <<< This is the session id you need to use to download the file
-  }
+    {
+    "message": "Download completed",
+    "filename": "actual_downloaded_filename.ext",
+    "download_link": "/files/<session_id>",
+    "expires_at": 1234567890.123,
+    "expires_in": 300
+    }
   ```
 
 ### 4. **GET** `/files/<session_id>`
@@ -484,19 +489,6 @@ Retrieve the downloaded file associated with a `session_id`. The file is served 
       ```json
       {"detail": "No downloadable file found."}
       ```
-
-5. **WebSocket** `/ws/<session_id>`
-
-This is a websocket endpoint that will send the download link to the client when the file is ready.
-
-- **Path Parameter**:
-    - `session_id` (string, **must be a valid UUID4 format**): The session ID generated during the `/download` request.
-- **Response**:
-    ```json
-    {
-        "message-from-author": "soon™"
-    }
-    ```
 
 #### Python Script Example to Download the File:
 
@@ -608,6 +600,53 @@ Checks if a YouTube video is geo-restricted. Requires Bearer token authenticatio
 - **Error Responses**:
     - `401 Unauthorized`: If `YOUTUBE_V3_APIKEY` is not configured on the server.
     - `403 Forbidden`: Invalid or missing token.
+
+
+---
+
+## WebSocket
+
+### 1. `/ws` WebSocket Connection `[Protected]` `[Cloudflare Turnstile]` `[DEMO v2 ONLY, May change in the future]`
+
+This is a websocket endpoint that will be used to create session, monitor the progress of the download, and get the download link when the file is ready.
+
+> [!Caution]
+> You must keep the websocket connection alive until you get the download link, otherwise your session will become invalid and will be removed from the queue.
+
+- **Payload (create session)**:
+    ```json
+    {
+        "action": "create_session",
+        "url": "https://www.youtube.com/watch?v=some_video_id",
+        "format": "313+251",
+        "cf-turnstile-token": "your_turnstile_token_here"
+    }
+    ```
+
+- **Received Payload (monitor progress)**:
+    ```json
+    {
+        "action": "monitor_progress",
+        "session_id": "550e8400-e29b-41d4-a716-446655440000",
+        "status": "downloading",
+        "progress": 0.5,
+        "message": "Downloading video..."
+    }
+    ```
+
+- **Received Payload (get download link) (DownloadResponse)**:
+    ```json
+    {
+    "message": "Download completed",
+    "filename": "actual_downloaded_filename.ext",
+    "download_link": "/files/<session_id>",
+    "expires_at": 1234567890.123,
+    "expires_in": 300
+    }
+    ```
+
+> [!Caution]
+> You must close the websocket connection after you get the download link.
 
 ---
 
