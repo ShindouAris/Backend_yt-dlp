@@ -4,8 +4,8 @@ This project provides a FastAPI-based API for downloading videos using `yt-dlp`.
 
 ---
 ## HOW NEW VERSION WORK (demo only, may not be accurate)
-<img src="assets/visual_drawing.excalidraw.png" alt="how_this_update_works">
-
+<img src="assets/queue_system.excalidraw.png" alt="how_this_update_works">
+<svg>
 ---
 
 ### 📚 Navigation
@@ -440,7 +440,7 @@ Fetches available download formats and subtitle information for a given video UR
   }
   ```
 
-### 3. **POST** `/download` `[Protected]` `[Cloudflare Turnstile]` `[Breaking Change v2.0.0]`
+### 3. **POST** `/download` `[Protected]` `[Cloudflare Turnstile]`
 
 Initiates a video download with optional subtitle embedding. Requires Bearer token authentication.
 
@@ -456,11 +456,8 @@ Initiates a video download with optional subtitle embedding. Requires Bearer tok
 - **Successful Response** (JSON, `DownloadResponse`):
   ```json
   {
-    "message": "Download completed",
-    "filename": "actual_downloaded_filename.ext",
-    "download_link": "/files/<session_id>",
-    "expires_at": 1234567890.123,
-    "expires_in": 300
+    "message": "Session created - Please connect to the websocket to get the download link",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000" // <<< This is the session id you need to use to download the file
   }
   ```
 
@@ -469,7 +466,7 @@ Initiates a video download with optional subtitle embedding. Requires Bearer tok
 Retrieve the downloaded file associated with a `session_id`. The file is served as an `application/octet-stream`.
 
 - **Path Parameter**:
-    - `session_id` (string, **must be a valid UUID4 format**): The session ID generated during the `/download` request.
+    - `session_id` (string, **must be a valid UUID4 format**): The session ID generated during the websocket session.
 
 - **Example URL**: `http://127.0.0.1:8000/files/550e8400-e29b-41d4-a716-446655440000`
 
@@ -487,6 +484,19 @@ Retrieve the downloaded file associated with a `session_id`. The file is served 
       ```json
       {"detail": "No downloadable file found."}
       ```
+
+5. **WebSocket** `/ws/<session_id>`
+
+This is a websocket endpoint that will send the download link to the client when the file is ready.
+
+- **Path Parameter**:
+    - `session_id` (string, **must be a valid UUID4 format**): The session ID generated during the `/download` request.
+- **Response**:
+    ```json
+    {
+        "message-from-author": "soon™"
+    }
+    ```
 
 #### Python Script Example to Download the File:
 
